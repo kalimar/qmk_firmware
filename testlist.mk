@@ -1,4 +1,5 @@
 include $(ROOT_DIR)/quantum/serial_link/tests/testlist.mk
+include $(ROOT_DIR)/quantum/effect/tests/testlist.mk
 
 define VALIDATE_TEST_LIST
     ifneq ($1,)
