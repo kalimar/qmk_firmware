@@ -3,35 +3,58 @@
 #include <tuple>
 
 extern "C" {
-    #include "../effect.h"
+    #include "quantum/effect/effect.h"
 }
 
-TEST(EffectTests, CreateEffectWithOneFrame) {
-    auto update = []() {
+class EffectTests : public testing::Test {
+public:
+    EffectTests() {
+        mock = &mock_instance;
+    }
 
+    ~EffectTests() {
+        mock = nullptr;
+    }
+
+    static void update1() {
+        mock->update1();
+    }
+
+    static void update2() {
+        mock->update2();
+    }
+
+    class update_mock_t {
+    public:
+        MOCK_METHOD0(update1, void ());
+        MOCK_METHOD0(update2, void ());
     };
 
-    effect_frame_t effect[] = {
+    static update_mock_t* mock;
+private:
+    update_mock_t mock_instance;
+};
+
+EffectTests::update_mock_t* EffectTests::mock = nullptr;
+
+TEST_F(EffectTests, UpdatingFirstFrameOfEffectShouldCallUpdate) {
+    effect_t effect[] = {
         {
             .duration = 10,
-            .update = update
+            .update = update1
         }
     };
+
+    add_effect(effect, sizeof(effect));
+    EXPECT_CALL(*mock, update1());
+    update_effects(1);
 }
 
-TEST(EffectTests, CreateEffectWithTwoFrames) {
-    auto update = []() {
-
-    };
-
-    auto update2 = []() {
-
-    };
-
-    effect_frame_t effect[] = {
+TEST_F(EffectTests, CreateEffectWithTwoFrames) {
+    effect_t effect[] = {
         {
             .duration = 10,
-            .update = update
+            .update = update1
         },
         {
             // No duration here means in instant keyframe
