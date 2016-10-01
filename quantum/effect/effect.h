@@ -1,6 +1,11 @@
 #pragma once
 
-typedef void (*effect_update_func_t)();
+typedef struct {
+    unsigned int duration;
+    unsigned int current_frame_time;
+} effect_param_t;
+
+typedef void (*effect_update_func_t)(const effect_param_t* param);
 
 typedef struct {
     unsigned int duration; // The duration of the effect in milliseconds
