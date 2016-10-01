@@ -40,14 +40,15 @@ private:
 EffectTests::update_mock_t* EffectTests::mock = nullptr;
 
 TEST_F(EffectTests, UpdateFirstFrame_ShouldCallUpdateWithCorrectParameters) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 10,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::duration, 10),
         Field(&effect_param_t::current_frame_time, 1)
@@ -56,28 +57,30 @@ TEST_F(EffectTests, UpdateFirstFrame_ShouldCallUpdateWithCorrectParameters) {
 }
 
 TEST_F(EffectTests, UpdateEffectThatHasEnded_ShouldCallNothing) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 5,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(1);
     update_effects(5);
     update_effects(1);
 }
 
 TEST_F(EffectTests, UpdateEffectWithDtLessThanDuration_ShouldAllowTheSameEffectToBeUpdatedAgain) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 5,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 4)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(4);
@@ -85,28 +88,30 @@ TEST_F(EffectTests, UpdateEffectWithDtLessThanDuration_ShouldAllowTheSameEffectT
 }
 
 TEST_F(EffectTests, UpdateEffectWithDtLongerThanDuration_ShouldCallUpdateAndEndTheEffect) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 5,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(6);
     update_effects(1);
 }
 
 TEST_F(EffectTests, UpdateSameEffectMultipleTimes_ShouldAllowUpdateToBeCalledForEachOfThem) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 10,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 4)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 9)));
@@ -120,14 +125,15 @@ TEST_F(EffectTests, UpdateSameEffectMultipleTimes_ShouldAllowUpdateToBeCalledFor
 }
 
 TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 5,
             .update = update1
         }
     };
+    effect_runtime_t runtime;
 
-    add_effect(effect, sizeof(effect));
+    add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     update_effects(0);
     update_effects(1);
@@ -135,7 +141,7 @@ TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
 
 
 TEST_F(EffectTests, CreateEffectWithTwoFrames) {
-    effect_t effect[] = {
+    effect_frame_t frames[] = {
         {
             .duration = 10,
             .update = update1
