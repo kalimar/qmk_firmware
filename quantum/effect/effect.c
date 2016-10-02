@@ -22,8 +22,16 @@ void update_effects(unsigned int dt) {
         effect_frame_t* frame = &effect->frames[effect->current_frame];
         unsigned update_time = dt <= effect->time_left_in_frame ? dt : effect->time_left_in_frame;
         dt -= update_time;
-        effect->time_left_in_frame -= update_time;
         effect_param_t param;
+        param.entry = false;
+        param.exit = false;
+        if (effect->time_left_in_frame == frame->duration) {
+            param.entry = true;
+        }
+        effect->time_left_in_frame -= update_time;
+        if(effect->time_left_in_frame == 0) {
+            param.exit = true;
+        }
         param.duration = frame->duration;
         param.current_frame_time = param.duration - effect->time_left_in_frame;
         param.current_frame_nr = effect->current_frame;
@@ -32,14 +40,13 @@ void update_effects(unsigned int dt) {
 
         if (effect->time_left_in_frame == 0) {
             effect->current_frame++;
-            if (effect->current_frame < effect->num_frames) {
-                effect->time_left_in_frame = effect->frames[effect->current_frame].duration;
-            }
-            else if(effect->loop > 0) {
+            if(effect->current_frame == effect->num_frames && effect->loop > 0) {
                 if (effect->loop != EFFECT_LOOP_INFINITE) {
                     effect->loop--;
                 }
                 effect->current_frame = 0;
+            }
+            if (effect->current_frame < effect->num_frames) {
                 effect->time_left_in_frame = effect->frames[effect->current_frame].duration;
             }
         }

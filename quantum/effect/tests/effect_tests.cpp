@@ -309,3 +309,45 @@ TEST_F(EffectTests, TwoFrameFixedLoop_ShouldLoopCorrectly) {
     Mock::VerifyAndClear(mock);
     update_effects(10);
 }
+
+TEST_F(EffectTests, EffectEntryAndExit_ShouldBeSetCorrectly) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::entry, true),
+        Field(&effect_param_t::exit, false)
+    )));
+    update_effects(2);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::entry, false),
+        Field(&effect_param_t::exit, false)
+    )));
+    update_effects(2);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::entry, false),
+        Field(&effect_param_t::exit, true)
+    )));
+    update_effects(2);
+}
+
+TEST_F(EffectTests, EffectEntryAndExit_CanBeSetAtTheSameTime) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::entry, true),
+        Field(&effect_param_t::exit, true)
+    )));
+    update_effects(5);
+}

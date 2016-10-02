@@ -2,12 +2,15 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct {
     uint32_t duration;
     uint32_t current_frame_time;
     uint32_t current_frame_nr;
     void* user_data;
+    bool entry;
+    bool exit;
 } effect_param_t;
 
 typedef void (*effect_update_func_t)(const effect_param_t* param);
