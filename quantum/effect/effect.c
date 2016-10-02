@@ -10,14 +10,26 @@ void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int 
     runtime->current_frame = 0;
     runtime->user_data = userdata;
     runtime->loop = loops;
+    runtime->next = NULL;
     if (loops != EFFECT_NO_LOOP && loops != EFFECT_LOOP_INFINITE) {
         runtime->loop--;
     }
-    active_effects = runtime;
+    if (!active_effects) {
+        active_effects = runtime;
+    } else {
+        effect_runtime_t* prev = active_effects;
+        while (prev->next) {
+            prev = prev->next;
+        }
+        prev->next = runtime;
+    }
 }
 
-void update_effects(unsigned int dt) {
-    effect_runtime_t* effect = active_effects;
+void clear_all_effects(void) {
+    active_effects = NULL;
+}
+
+void update_effect(unsigned int dt, effect_runtime_t* effect) {
     while (dt > 0 && effect->current_frame < effect->num_frames) {
         effect_frame_t* frame = &effect->frames[effect->current_frame];
         unsigned update_time = dt <= effect->time_left_in_frame ? dt : effect->time_left_in_frame;
@@ -50,5 +62,13 @@ void update_effects(unsigned int dt) {
                 effect->time_left_in_frame = effect->frames[effect->current_frame].duration;
             }
         }
+    }
+}
+
+void update_effects(unsigned int dt) {
+    effect_runtime_t* effect = active_effects;
+    while(effect) {
+        update_effect(dt, effect);
+        effect = effect->next;
     }
 }

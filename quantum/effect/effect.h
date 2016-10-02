@@ -20,7 +20,8 @@ typedef struct {
     effect_update_func_t update; // The update function
 } effect_frame_t;
 
-typedef struct {
+typedef struct effect_runtime{
+    struct effect_runtime* next;
     effect_frame_t* frames;
     uint32_t time_left_in_frame;
     uint32_t current_frame;
@@ -35,4 +36,5 @@ typedef struct {
 
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
     uint16_t loops);
+void clear_all_effects(void);
 void update_effects(unsigned int dt);

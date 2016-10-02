@@ -16,6 +16,7 @@ public:
 
     ~EffectTests() {
         mock = nullptr;
+        clear_all_effects();
     }
 
     static void update1(const effect_param_t* param) {
@@ -350,4 +351,73 @@ TEST_F(EffectTests, EffectEntryAndExit_CanBeSetAtTheSameTime) {
         Field(&effect_param_t::exit, true)
     )));
     update_effects(5);
+}
+
+TEST_F(EffectTests, UpdateTwoEffects_ShouldNotAffectEachOther) {
+    effect_frame_t frames1[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    effect_frame_t frames2[] = {
+        {
+            .duration = 10,
+            .update = update2
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames1, sizeof(frames1), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames2, sizeof(frames2), &data2, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update2(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(2);
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 6)));
+    update_effects(4);
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10)));
+    update_effects(6);
+}
+
+
+TEST_F(EffectTests, UpdateTwoEffectsWithSameFrames_ShouldGetDifferentUserData) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(2);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(4);
 }
