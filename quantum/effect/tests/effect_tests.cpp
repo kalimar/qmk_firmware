@@ -51,7 +51,8 @@ TEST_F(EffectTests, UpdateFirstFrame_ShouldCallUpdateWithCorrectParameters) {
     add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::duration, 10),
-        Field(&effect_param_t::current_frame_time, 1)
+        Field(&effect_param_t::current_frame_time, 1),
+        Field(&effect_param_t::current_frame_nr, 0)
     )));
     update_effects(1);
 }
@@ -155,12 +156,14 @@ TEST_F(EffectTests, UpdateSecondFrameFromStart_ShouldUpdateItWithTheCorrectParam
     add_effect(&runtime, frames, sizeof(frames));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::duration, 10),
-        Field(&effect_param_t::current_frame_time, 10)
+        Field(&effect_param_t::current_frame_time, 10),
+        Field(&effect_param_t::current_frame_nr, 0)
     )));
     update_effects(10);
     EXPECT_CALL(*mock, update2(AllOf(
         Field(&effect_param_t::duration, 5),
-        Field(&effect_param_t::current_frame_time, 1)
+        Field(&effect_param_t::current_frame_time, 1),
+        Field(&effect_param_t::current_frame_nr, 1)
     )));
     update_effects(1);
 }

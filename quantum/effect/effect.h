@@ -6,6 +6,7 @@
 typedef struct {
     unsigned int duration;
     unsigned int current_frame_time;
+    unsigned int current_frame_nr;
 } effect_param_t;
 
 typedef void (*effect_update_func_t)(const effect_param_t* param);

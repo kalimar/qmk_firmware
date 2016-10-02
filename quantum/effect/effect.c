@@ -20,6 +20,7 @@ void update_effects(unsigned int dt) {
         effect_param_t param;
         param.duration = frame->duration;
         param.current_frame_time = param.duration - effect->time_left_in_frame;
+        param.current_frame_nr = effect->current_frame;
         frame->update(&param);
 
         if (effect->time_left_in_frame == 0) {
