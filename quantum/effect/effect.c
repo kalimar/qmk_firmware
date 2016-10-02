@@ -25,6 +25,18 @@ void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int 
     }
 }
 
+void remove_effect(effect_runtime_t* runtime) {
+    if (runtime == active_effects) {
+        active_effects = active_effects->next;
+    } else {
+        effect_runtime_t* effect = active_effects;
+        if (effect->next == runtime) {
+            effect->next = effect->next->next;
+            return;
+        }
+    }
+}
+
 void clear_all_effects(void) {
     active_effects = NULL;
 }
@@ -72,3 +84,4 @@ void update_effects(unsigned int dt) {
         effect = effect->next;
     }
 }
+

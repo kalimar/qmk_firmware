@@ -421,3 +421,64 @@ TEST_F(EffectTests, UpdateTwoEffectsWithSameFrames_ShouldGetDifferentUserData) {
     )));
     update_effects(4);
 }
+
+TEST_F(EffectTests, RemoveFirstEffect_ShouldNotUpdateItAnymore) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    remove_effect(&runtime1);
+
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data2)));
+    update_effects(1);
+}
+
+TEST_F(EffectTests, RemoveLastEffect_ShouldNotUpdateItAnymore) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    remove_effect(&runtime2);
+
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data1)));
+    update_effects(1);
+}
+
+TEST_F(EffectTests, RemoveMiddleEffect_ShouldStillUpdateTheOthers) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    int data3 = 3;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    effect_runtime_t runtime3;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime3, frames, sizeof(frames), &data3, EFFECT_NO_LOOP);
+    remove_effect(&runtime2);
+
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data1)));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data3)));
+    update_effects(1);
+}

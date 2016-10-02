@@ -36,5 +36,6 @@ typedef struct effect_runtime{
 
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
     uint16_t loops);
+void remove_effect(effect_runtime_t* runtime);
 void clear_all_effects(void);
 void update_effects(unsigned int dt);
