@@ -10,18 +10,21 @@ void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int 
     runtime->current_frame = 0;
     runtime->user_data = userdata;
     runtime->loop = loops;
-    runtime->next = NULL;
     if (loops != EFFECT_NO_LOOP && loops != EFFECT_LOOP_INFINITE) {
         runtime->loop--;
     }
     if (!active_effects) {
         active_effects = runtime;
+        runtime->next = NULL;
     } else {
         effect_runtime_t* prev = active_effects;
-        while (prev->next) {
+        while (prev->next && prev != runtime) {
             prev = prev->next;
         }
-        prev->next = runtime;
+        if (prev != runtime) {
+            prev->next = runtime;
+            runtime->next = NULL;
+        }
     }
 }
 

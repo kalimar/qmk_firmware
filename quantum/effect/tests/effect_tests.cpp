@@ -482,3 +482,122 @@ TEST_F(EffectTests, RemoveMiddleEffect_ShouldStillUpdateTheOthers) {
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data3)));
     update_effects(1);
 }
+
+TEST_F(EffectTests, ReAddFirstEffect_ShouldRestartIt) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(2);
+
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 3),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(3);
+}
+
+TEST_F(EffectTests, ReAddLastEffect_ShouldRestartIt) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(2);
+
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 3),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    update_effects(3);
+}
+
+TEST_F(EffectTests, ReAddMiddleEffect_ShouldRestartIt) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+    };
+    int data1 = 1;
+    int data2 = 2;
+    int data3 = 3;
+    effect_runtime_t runtime1;
+    effect_runtime_t runtime2;
+    effect_runtime_t runtime3;
+    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime3, frames, sizeof(frames), &data3, EFFECT_NO_LOOP);
+
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 2),
+        Field(&effect_param_t::user_data, &data3)
+    )));
+    update_effects(2);
+
+    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data1)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 3),
+        Field(&effect_param_t::user_data, &data2)
+    )));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::current_frame_time, 5),
+        Field(&effect_param_t::user_data, &data3)
+    )));
+    update_effects(3);
+}
