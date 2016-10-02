@@ -2,11 +2,12 @@
 
 static effect_runtime_t* active_effects = NULL;
 
-void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size) {
+void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata) {
     runtime->frames = frames;
     runtime->time_left_in_frame = frames->duration;
     runtime->num_frames = frames_size / sizeof(effect_frame_t);
     runtime->current_frame = 0;
+    runtime->user_data = userdata;
     active_effects = runtime;
 }
 
@@ -21,6 +22,7 @@ void update_effects(unsigned int dt) {
         param.duration = frame->duration;
         param.current_frame_time = param.duration - effect->time_left_in_frame;
         param.current_frame_nr = effect->current_frame;
+        param.user_data = effect->user_data;
         frame->update(&param);
 
         if (effect->time_left_in_frame == 0) {
