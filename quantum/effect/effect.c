@@ -13,16 +13,15 @@ void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int 
 void update_effects(unsigned int dt) {
     effect_runtime_t* effect = active_effects;
     while (dt > 0 && effect->current_frame < effect->num_frames) {
-        if (effect->time_left_in_frame > 0) {
-            unsigned update_time = dt <= effect->time_left_in_frame ? dt : effect->time_left_in_frame;
-            dt -= update_time;
-            effect->time_left_in_frame -= update_time;
-            effect_param_t param;
-            effect_frame_t* frame = &effect->frames[effect->current_frame];
-            param.duration = frame->duration;
-            param.current_frame_time = param.duration - effect->time_left_in_frame;
-            frame->update(&param);
-        }
+        effect_frame_t* frame = &effect->frames[effect->current_frame];
+        unsigned update_time = dt <= effect->time_left_in_frame ? dt : effect->time_left_in_frame;
+        dt -= update_time;
+        effect->time_left_in_frame -= update_time;
+        effect_param_t param;
+        param.duration = frame->duration;
+        param.current_frame_time = param.duration - effect->time_left_in_frame;
+        frame->update(&param);
+
         if (effect->time_left_in_frame == 0) {
             effect->current_frame++;
             if (effect->current_frame < effect->num_frames) {

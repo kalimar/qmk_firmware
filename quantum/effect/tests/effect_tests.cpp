@@ -147,15 +147,21 @@ TEST_F(EffectTests, UpdateSecondFrameFromStart_ShouldUpdateItWithTheCorrectParam
             .update = update1
         },
         {
-            .duration = 10,
+            .duration = 5,
             .update = update2
         }
     };
     effect_runtime_t runtime;
     add_effect(&runtime, frames, sizeof(frames));
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 10)));
+    EXPECT_CALL(*mock, update1(AllOf(
+        Field(&effect_param_t::duration, 10),
+        Field(&effect_param_t::current_frame_time, 10)
+    )));
     update_effects(10);
-    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 1)));
+    EXPECT_CALL(*mock, update2(AllOf(
+        Field(&effect_param_t::duration, 5),
+        Field(&effect_param_t::current_frame_time, 1)
+    )));
     update_effects(1);
 }
 
@@ -175,4 +181,46 @@ TEST_F(EffectTests, UpdateFirstFrameWithExcessTime_ShouldUpdateTheSecondFrameWit
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 6)));
     update_effects(11);
+}
+
+TEST_F(EffectTests, UpdatingWithBigEnoughDt_ShouldUpdateAllTheFramesBetween) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+        {
+            .duration = 10,
+            .update = update2
+        },
+        {
+            .duration = 10,
+            .update = update2
+        }
+    };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10))).Times(2);
+    update_effects(26);
+    update_effects(1);
+}
+
+TEST_F(EffectTests, UpdatingInstantFrame_ShouldMoveToTheNextFrameWithoutUsingTime) {
+    effect_frame_t frames[] = {
+        {
+            // In c the duration can be left out complete, but c++ requires it
+            .duration = 0,
+            .update = update1
+        },
+        {
+            .duration = 10,
+            .update = update2
+        },
+    };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 0)));
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 2)));
+    update_effects(2);
 }
