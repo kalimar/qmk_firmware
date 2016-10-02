@@ -17,7 +17,9 @@ typedef struct {
 
 typedef struct {
     effect_frame_t* frames;
-    int32_t time_left_in_frame;
+    unsigned int time_left_in_frame;
+    unsigned int current_frame;
+    unsigned int num_frames;
 } effect_runtime_t;
 
 

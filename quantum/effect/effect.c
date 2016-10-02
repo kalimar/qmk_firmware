@@ -5,20 +5,29 @@ static effect_runtime_t* active_effects = NULL;
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size) {
     runtime->frames = frames;
     runtime->time_left_in_frame = frames->duration;
+    runtime->num_frames = frames_size / sizeof(effect_frame_t);
+    runtime->current_frame = 0;
     active_effects = runtime;
 }
 
 void update_effects(unsigned int dt) {
-    if (dt == 0) {
-        return;
-    }
     effect_runtime_t* effect = active_effects;
-    if (effect->time_left_in_frame > 0) {
-        effect->time_left_in_frame -= dt;
-        effect_param_t param;
-        param.duration = effect->frames[0].duration;
-        unsigned real_left_in_frame = effect->time_left_in_frame > 0 ? effect->time_left_in_frame : 0;
-        param.current_frame_time = param.duration - real_left_in_frame;
-        effect->frames->update(&param);
+    while (dt > 0 && effect->current_frame < effect->num_frames) {
+        if (effect->time_left_in_frame > 0) {
+            unsigned update_time = dt <= effect->time_left_in_frame ? dt : effect->time_left_in_frame;
+            dt -= update_time;
+            effect->time_left_in_frame -= update_time;
+            effect_param_t param;
+            effect_frame_t* frame = &effect->frames[effect->current_frame];
+            param.duration = frame->duration;
+            param.current_frame_time = param.duration - effect->time_left_in_frame;
+            frame->update(&param);
+        }
+        if (effect->time_left_in_frame == 0) {
+            effect->current_frame++;
+            if (effect->current_frame < effect->num_frames) {
+                effect->time_left_in_frame = effect->frames[effect->current_frame].duration;
+            }
+        }
     }
 }

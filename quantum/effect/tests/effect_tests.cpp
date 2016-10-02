@@ -140,18 +140,39 @@ TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
 }
 
 
-TEST_F(EffectTests, CreateEffectWithTwoFrames) {
+TEST_F(EffectTests, UpdateSecondFrameFromStart_ShouldUpdateItWithTheCorrectParameters) {
     effect_frame_t frames[] = {
         {
             .duration = 10,
             .update = update1
         },
         {
-            // No duration here means in instant keyframe
-            // The GCC c++ version don't like leaving this out, but when compiling in pure c it should be
-            // possible
-            .duration = 0,
+            .duration = 10,
             .update = update2
         }
     };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 10)));
+    update_effects(10);
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 1)));
+    update_effects(1);
+}
+
+TEST_F(EffectTests, UpdateFirstFrameWithExcessTime_ShouldUpdateTheSecondFrameWithTheRemainder) {
+    effect_frame_t frames[] = {
+        {
+            .duration = 5,
+            .update = update1
+        },
+        {
+            .duration = 10,
+            .update = update2
+        }
+    };
+    effect_runtime_t runtime;
+    add_effect(&runtime, frames, sizeof(frames));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 6)));
+    update_effects(11);
 }
