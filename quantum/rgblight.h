@@ -119,11 +119,11 @@ void rgblight_timer_init(void);
 void rgblight_timer_enable(void);
 void rgblight_timer_disable(void);
 void rgblight_timer_toggle(void);
-void rgblight_effect_breathing(uint8_t interval);
-void rgblight_effect_rainbow_mood(uint8_t interval);
-void rgblight_effect_rainbow_swirl(uint8_t interval);
-void rgblight_effect_snake(uint8_t interval);
-void rgblight_effect_knight(uint8_t interval);
+void rgblight_effect_breathing(uint8_t pos);
+void rgblight_effect_rainbow_mood(uint16_t hue);
+void rgblight_effect_rainbow_swirl(uint16_t hue, int8_t direction);
+void rgblight_effect_snake(uint8_t pos, int8_t direction);
+void rgblight_effect_knight(int8_t pos);
 void rgblight_effect_christmas(void);
 
 #endif

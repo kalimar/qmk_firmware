@@ -105,7 +105,7 @@ uint32_t eeconfig_read_rgblight(void) {
   return eeprom_read_dword(EECONFIG_RGBLIGHT);
 }
 void eeconfig_update_rgblight(uint32_t val) {
-  eeprom_update_dword(EECONFIG_RGBLIGHT, val);
+  //eeprom_update_dword(EECONFIG_RGBLIGHT, val);
 }
 void eeconfig_update_rgblight_default(void) {
   dprintf("eeconfig_update_rgblight_default\n");
@@ -426,99 +426,89 @@ void rgblight_show_solid_color(uint8_t r, uint8_t g, uint8_t b) {
   rgblight_setrgb(r, g, b);
 }
 
-void rgblight_task(void) {
-  if (rgblight_timer_enabled) {
-    // mode = 1, static light, do nothing here
-    if (rgblight_config.mode >= 2 && rgblight_config.mode <= 5) {
-      // mode = 2 to 5, breathing mode
-      rgblight_effect_breathing(rgblight_config.mode - 2);
-    } else if (rgblight_config.mode >= 6 && rgblight_config.mode <= 8) {
-      // mode = 6 to 8, rainbow mood mod
-      rgblight_effect_rainbow_mood(rgblight_config.mode - 6);
-    } else if (rgblight_config.mode >= 9 && rgblight_config.mode <= 14) {
-      // mode = 9 to 14, rainbow swirl mode
-      rgblight_effect_rainbow_swirl(rgblight_config.mode - 9);
-    } else if (rgblight_config.mode >= 15 && rgblight_config.mode <= 20) {
-      // mode = 15 to 20, snake mode
-      rgblight_effect_snake(rgblight_config.mode - 15);
-    } else if (rgblight_config.mode >= 21 && rgblight_config.mode <= 23) {
-      // mode = 21 to 23, knight mode
-      rgblight_effect_knight(rgblight_config.mode - 21);
-    } else if (rgblight_config.mode == 24) {
+static uint16_t current_tick = 0;
+
+static bool tick(uint8_t interval) {
+  static uint16_t last_timer = 0;
+
+  if (timer_elapsed(last_timer) < interval) {
+    return false;
+  }
+  last_timer = timer_read();
+  current_tick++;
+  return true;
+}
+
+ISR(TIMER3_COMPA_vect) {
+  // mode = 1, static light, do nothing here
+  if (mode >= 2 && mode <= 5) {
+    // mode = 2 to 5, breathing mode
+    if (tick(pgm_read_byte(&RGBLED_BREATHING_INTERVALS[mode - 2]))) {
+      rgblight_effect_breathing(current_tick % 255);
+    }
+  } else if (mode >= 6 && mode <= 8) {
+    // mode = 6 to 8, rainbow mood mode
+    if (tick(pgm_read_byte(&RGBLED_RAINBOW_MOOD_INTERVALS[mode - 6]))) {
+      rgblight_effect_rainbow_mood(current_tick % 360);
+    }
+  } else if (mode >= 9 && mode <= 14) {
+    // mode = 9 to 14, rainbow swirl mode
+    const unsigned m = mode - 9;
+    if (tick(pgm_read_byte(&RGBLED_RAINBOW_SWIRL_INTERVALS[m / 2]))) {
+      rgblight_effect_rainbow_swirl(current_tick % 360, m % 2 ? 1 : -1);
+    }
+  } else if (mode >= 15 && mode <= 20) {
+    // mode = 15 to 20, snake mode
+    const unsigned m = mode - 15;
+    if (tick(pgm_read_byte(&RGBLED_SNAKE_INTERVALS[m / 2]))) {
+      rgblight_effect_snake(current_tick % (RGBLED_NUM), m % 2 ? 1 : - 1);
+  } else if (mode >= 21 && mode <= 23) {
+    // mode = 21 to 23, knight mode
+    rgblight_effect_knight(rgblight_config.mode - 21);
+  }else if (rgblight_config.mode == 24) {
       // mode = 24, christmas mode
       rgblight_effect_christmas();
-    }
   }
 }
+#endif
 
 // Effects
-void rgblight_effect_breathing(uint8_t interval) {
-  static uint8_t pos = 0;
-  static uint16_t last_timer = 0;
 
-  if (timer_elapsed(last_timer) < pgm_read_byte(&RGBLED_BREATHING_INTERVALS[interval])) {
-    return;
-  }
-  last_timer = timer_read();
-
+// Pos should be a value in the range 0-255
+void rgblight_effect_breathing(uint8_t pos) {
   rgblight_sethsv_noeeprom(rgblight_config.hue, rgblight_config.sat, pgm_read_byte(&LED_BREATHING_TABLE[pos]));
-  pos = (pos + 1) % 256;
 }
-void rgblight_effect_rainbow_mood(uint8_t interval) {
-  static uint16_t current_hue = 0;
-  static uint16_t last_timer = 0;
 
-  if (timer_elapsed(last_timer) < pgm_read_byte(&RGBLED_RAINBOW_MOOD_INTERVALS[interval])) {
-    return;
-  }
-  last_timer = timer_read();
+// Current hue should be a in the range from 0-359
+void rgblight_effect_rainbow_mood(uint16_t current_hue) {
   rgblight_sethsv_noeeprom(current_hue, rgblight_config.sat, rgblight_config.val);
-  current_hue = (current_hue + 1) % 360;
 }
-void rgblight_effect_rainbow_swirl(uint8_t interval) {
-  static uint16_t current_hue = 0;
-  static uint16_t last_timer = 0;
-  uint16_t hue;
-  uint8_t i;
-  if (timer_elapsed(last_timer) < pgm_read_byte(&RGBLED_RAINBOW_MOOD_INTERVALS[interval / 2])) {
-    return;
+
+// Current hue should be a in the range from 0-359
+// Direction is either -1 or 1
+void rgblight_effect_rainbow_swirl(uint16_t current_hue, int8_t direction) {
+  if (direction == -1) {
+    current_hue = 359-current_hue;
   }
-  last_timer = timer_read();
-  for (i = 0; i < RGBLED_NUM; i++) {
-    hue = (360 / RGBLED_NUM * i + current_hue) % 360;
+  for (unsigned i = 0; i < RGBLED_NUM; i++) {
+    uint16_t hue = (360 / RGBLED_NUM * i + current_hue) % 360;
     sethsv(hue, rgblight_config.sat, rgblight_config.val, (LED_TYPE *)&led[i]);
   }
   rgblight_set();
-
-  if (interval % 2) {
-    current_hue = (current_hue + 1) % 360;
-  } else {
-    if (current_hue - 1 < 0) {
-      current_hue = 359;
-    } else {
-      current_hue = current_hue - 1;
-    }
-  }
 }
-void rgblight_effect_snake(uint8_t interval) {
-  static uint8_t pos = 0;
-  static uint16_t last_timer = 0;
-  uint8_t i, j;
-  int8_t k;
-  int8_t increment = 1;
-  if (interval % 2) {
-    increment = -1;
+
+// Pos should be a value in the range 0-(RGBLED_NUM - 1)
+// Direction either -1 or 1
+void rgblight_effect_snake(uint8_t pos, int8_t direction) {
+  if(direction == -1) {
+      pos = RGBLED_NUM - 1 - pos;
   }
-  if (timer_elapsed(last_timer) < pgm_read_byte(&RGBLED_SNAKE_INTERVALS[interval / 2])) {
-    return;
-  }
-  last_timer = timer_read();
-  for (i = 0; i < RGBLED_NUM; i++) {
+  for (unsigned i = 0; i < RGBLED_NUM; i++) {
     led[i].r = 0;
     led[i].g = 0;
     led[i].b = 0;
-    for (j = 0; j < RGBLIGHT_EFFECT_SNAKE_LENGTH; j++) {
-      k = pos + j * increment;
+    for (unsigned j = 0; j < RGBLIGHT_EFFECT_SNAKE_LENGTH; j++) {
+      unsigned k = pos + j * direction;
       if (k < 0) {
         k = k + RGBLED_NUM;
       }
@@ -528,16 +518,8 @@ void rgblight_effect_snake(uint8_t interval) {
     }
   }
   rgblight_set();
-  if (increment == 1) {
-    if (pos - 1 < 0) {
-      pos = RGBLED_NUM - 1;
-    } else {
-      pos -= 1;
-    }
-  } else {
-    pos = (pos + 1) % RGBLED_NUM;
-  }
 }
+
 void rgblight_effect_knight(uint8_t interval) {
   static int8_t pos = 0;
   static uint16_t last_timer = 0;
@@ -609,5 +591,3 @@ void rgblight_effect_christmas(void) {
   }
   rgblight_set();
 }
-
-#endif
