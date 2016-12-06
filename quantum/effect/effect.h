@@ -23,8 +23,7 @@ typedef struct {
 typedef struct effect_runtime{
     struct effect_runtime* next;
     effect_frame_t* frames;
-    uint32_t time_left_in_frame;
-    uint32_t current_frame;
+    uint32_t start_time;
     uint32_t num_frames;
     void* user_data;
     uint16_t loop;
