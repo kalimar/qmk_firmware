@@ -12,6 +12,8 @@ class EffectTests : public testing::Test {
 public:
     EffectTests() {
         mock = &mock_instance;
+        // Reset the current time to zero
+        update_effects(0);
     }
 
     ~EffectTests() {
@@ -72,7 +74,7 @@ TEST_F(EffectTests, UpdateEffectThatHasEnded_ShouldCallNothing) {
     add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(1);
     update_effects(5);
-    update_effects(1);
+    update_effects(6);
 }
 
 TEST_F(EffectTests, UpdateEffectWithDtLessThanDuration_ShouldAllowTheSameEffectToBeUpdatedAgain) {
@@ -88,7 +90,7 @@ TEST_F(EffectTests, UpdateEffectWithDtLessThanDuration_ShouldAllowTheSameEffectT
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 4)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(4);
-    update_effects(1);
+    update_effects(5);
 }
 
 TEST_F(EffectTests, UpdateEffectWithDtLongerThanDuration_ShouldCallUpdateAndEndTheEffect) {
@@ -103,7 +105,7 @@ TEST_F(EffectTests, UpdateEffectWithDtLongerThanDuration_ShouldCallUpdateAndEndT
     add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(6);
-    update_effects(1);
+    update_effects(7);
 }
 
 TEST_F(EffectTests, UpdateSameEffectMultipleTimes_ShouldAllowUpdateToBeCalledForEachOfThem) {
@@ -121,11 +123,11 @@ TEST_F(EffectTests, UpdateSameEffectMultipleTimes_ShouldAllowUpdateToBeCalledFor
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 9)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 10)));
     update_effects(1);
-    update_effects(3);
-    update_effects(5);
-    update_effects(2);
+    update_effects(4);
+    update_effects(9);
+    update_effects(13);
     // The effect should have ended here
-    update_effects(1);
+    update_effects(14);
 }
 
 TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
@@ -138,8 +140,9 @@ TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
     effect_runtime_t runtime;
 
     add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
+    EXPECT_CALL(*mock, update1(_)).Times(0);
     update_effects(0);
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     update_effects(1);
 }
 
@@ -171,7 +174,7 @@ TEST_F(EffectTests, UpdateSecondFrameFromStart_ShouldUpdateItWithTheCorrectParam
         Field(&effect_param_t::current_frame_nr, 1),
         Field(&effect_param_t::user_data, &userdata)
     )));
-    update_effects(1);
+    update_effects(11);
 }
 
 TEST_F(EffectTests, UpdateFirstFrameWithExcessTime_ShouldUpdateTheSecondFrameWithTheRemainder) {
@@ -212,7 +215,7 @@ TEST_F(EffectTests, UpdatingWithBigEnoughDt_ShouldUpdateAllTheFramesBetween) {
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10))).Times(2);
     update_effects(26);
-    update_effects(1);
+    update_effects(27);
 }
 
 TEST_F(EffectTests, UpdatingInstantFrame_ShouldMoveToTheNextFrameWithoutUsingTime) {
@@ -251,7 +254,7 @@ TEST_F(EffectTests, UpdatingInstantFrameAfterNormalWithExactTime_IsUpdatedDuring
     update_effects(10);
     Mock::VerifyAndClearExpectations(mock);
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0)));
-    update_effects(10);
+    update_effects(20);
 }
 
 TEST_F(EffectTests, OneFrameInfiniteLoopingEffect_ShouldLoopCorrectly) {
@@ -268,7 +271,7 @@ TEST_F(EffectTests, OneFrameInfiniteLoopingEffect_ShouldLoopCorrectly) {
     update_effects(6);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(3);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
-    update_effects(15);
+    update_effects(21);
 }
 
 TEST_F(EffectTests, OneFrameFixedLoop_ShouldLoopCorrectly) {
@@ -283,8 +286,8 @@ TEST_F(EffectTests, OneFrameFixedLoop_ShouldLoopCorrectly) {
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     update_effects(1);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(2);
-    update_effects(10);
-    update_effects(2);
+    update_effects(11);
+    update_effects(13);
 }
 
 TEST_F(EffectTests, TwoFrameFixedLoop_ShouldLoopCorrectly) {
@@ -306,9 +309,9 @@ TEST_F(EffectTests, TwoFrameFixedLoop_ShouldLoopCorrectly) {
     update_effects(6);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(2);
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0))).Times(2);
-    update_effects(10);
+    update_effects(16);
     Mock::VerifyAndClear(mock);
-    update_effects(10);
+    update_effects(26);
 }
 
 TEST_F(EffectTests, EffectEntryAndExit_ShouldBeSetCorrectly) {
@@ -329,12 +332,12 @@ TEST_F(EffectTests, EffectEntryAndExit_ShouldBeSetCorrectly) {
         Field(&effect_param_t::entry, false),
         Field(&effect_param_t::exit, false)
     )));
-    update_effects(2);
+    update_effects(4);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::entry, false),
         Field(&effect_param_t::exit, true)
     )));
-    update_effects(2);
+    update_effects(6);
 }
 
 TEST_F(EffectTests, EffectEntryAndExit_CanBeSetAtTheSameTime) {
@@ -383,9 +386,9 @@ TEST_F(EffectTests, UpdateTwoEffects_ShouldNotAffectEachOther) {
     update_effects(2);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 6)));
-    update_effects(4);
-    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10)));
     update_effects(6);
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10)));
+    update_effects(12);
 }
 
 
@@ -419,7 +422,7 @@ TEST_F(EffectTests, UpdateTwoEffectsWithSameFrames_ShouldGetDifferentUserData) {
         Field(&effect_param_t::current_frame_time, 5),
         Field(&effect_param_t::user_data, &data2)
     )));
-    update_effects(4);
+    update_effects(6);
 }
 
 TEST_F(EffectTests, RemoveFirstEffect_ShouldNotUpdateItAnymore) {
@@ -516,7 +519,7 @@ TEST_F(EffectTests, ReAddFirstEffect_ShouldRestartIt) {
         Field(&effect_param_t::current_frame_time, 5),
         Field(&effect_param_t::user_data, &data2)
     )));
-    update_effects(3);
+    update_effects(5);
 }
 
 TEST_F(EffectTests, ReAddLastEffect_ShouldRestartIt) {
@@ -552,7 +555,7 @@ TEST_F(EffectTests, ReAddLastEffect_ShouldRestartIt) {
         Field(&effect_param_t::current_frame_time, 3),
         Field(&effect_param_t::user_data, &data2)
     )));
-    update_effects(3);
+    update_effects(5);
 }
 
 TEST_F(EffectTests, ReAddMiddleEffect_ShouldRestartIt) {
@@ -599,5 +602,5 @@ TEST_F(EffectTests, ReAddMiddleEffect_ShouldRestartIt) {
         Field(&effect_param_t::current_frame_time, 5),
         Field(&effect_param_t::user_data, &data3)
     )));
-    update_effects(3);
+    update_effects(5);
 }

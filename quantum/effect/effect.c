@@ -1,6 +1,7 @@
 #include "effect.h"
 
 static effect_runtime_t* active_effects = NULL;
+static uint16_t current_time = 0;
 
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
     uint16_t loops) {
@@ -80,7 +81,13 @@ void update_effect(unsigned int dt, effect_runtime_t* effect) {
     }
 }
 
-void update_effects(unsigned int dt) {
+void update_effects(uint16_t abstime) {
+    uint16_t dt = abstime - current_time;
+    // We don't want huge Dts that could look everything up
+    if (dt > 1000) {
+        dt = 1000;
+    }
+    current_time = abstime;
     effect_runtime_t* effect = active_effects;
     while(effect) {
         update_effect(dt, effect);
