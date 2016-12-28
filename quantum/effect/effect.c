@@ -1,4 +1,5 @@
 #include "effect.h"
+#include <memory.h>
 
 static effect_runtime_t* active_effects = NULL;
 static uint16_t last_time = 0;
@@ -13,11 +14,14 @@ static uint32_t calculate_effect_length(effect_runtime_t* effect) {
 }
 
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
-    uint16_t loops) {
+    unsigned userdata_size, uint16_t loops) {
+    if (userdata_size > EFFECT_MAX_USERDATA_SIZE) {
+        return;
+    }
     runtime->frames = frames;
     runtime->start_time = current_time;
     runtime->num_frames = frames_size / sizeof(effect_frame_t);
-    runtime->user_data = userdata;
+    memcpy(runtime->userdata,  userdata, userdata_size);
     runtime->loop = loops;
     runtime->length = calculate_effect_length(runtime);
     if (!active_effects) {
@@ -91,7 +95,7 @@ static bool update_effect(uint32_t prev_time, unsigned int dt, effect_runtime_t*
         param.duration = frame->duration;
         param.current_frame_time = param.duration - time_left_in_frame;
         param.current_frame_nr = current_frame;
-        param.user_data = effect->user_data;
+        param.user_data = effect->userdata;
         frame->update(&param);
 
         if (param.exit) {

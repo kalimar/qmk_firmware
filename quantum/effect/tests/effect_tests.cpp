@@ -52,12 +52,12 @@ TEST_F(EffectTests, UpdateFirstFrame_ShouldCallUpdateWithCorrectParameters) {
     effect_runtime_t runtime;
     int userdata = 5;
 
-    add_effect(&runtime, frames, sizeof(frames), &userdata, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), &userdata, sizeof(userdata), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::duration, 10),
         Field(&effect_param_t::current_frame_time, 1),
         Field(&effect_param_t::current_frame_nr, 0),
-        Field(&effect_param_t::user_data, &userdata)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(userdata)))
     )));
     update_effects(1);
 }
@@ -71,7 +71,7 @@ TEST_F(EffectTests, UpdateEffectThatHasEnded_ShouldCallNothing) {
     };
     effect_runtime_t runtime;
 
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(1);
     update_effects(5);
     update_effects(6);
@@ -86,7 +86,7 @@ TEST_F(EffectTests, UpdateEffectWithDtLessThanDuration_ShouldAllowTheSameEffectT
     };
     effect_runtime_t runtime;
 
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 4)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(4);
@@ -102,7 +102,7 @@ TEST_F(EffectTests, UpdateEffectWithDtLongerThanDuration_ShouldCallUpdateAndEndT
     };
     effect_runtime_t runtime;
 
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     update_effects(6);
     update_effects(7);
@@ -117,7 +117,7 @@ TEST_F(EffectTests, UpdateSameEffectMultipleTimes_ShouldAllowUpdateToBeCalledFor
     };
     effect_runtime_t runtime;
 
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 4)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 9)));
@@ -139,7 +139,7 @@ TEST_F(EffectTests, UpdateEffectWithZeroDt_ShouldDoNothing) {
     };
     effect_runtime_t runtime;
 
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(_)).Times(0);
     update_effects(0);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
@@ -160,19 +160,19 @@ TEST_F(EffectTests, UpdateSecondFrameFromStart_ShouldUpdateItWithTheCorrectParam
     };
     int userdata = 3;
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), &userdata, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), &userdata, sizeof(userdata), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::duration, 10),
         Field(&effect_param_t::current_frame_time, 10),
         Field(&effect_param_t::current_frame_nr, 0),
-        Field(&effect_param_t::user_data, &userdata)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(userdata)))
     )));
     update_effects(10);
     EXPECT_CALL(*mock, update2(AllOf(
         Field(&effect_param_t::duration, 5),
         Field(&effect_param_t::current_frame_time, 1),
         Field(&effect_param_t::current_frame_nr, 1),
-        Field(&effect_param_t::user_data, &userdata)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(userdata)))
     )));
     update_effects(11);
 }
@@ -189,7 +189,7 @@ TEST_F(EffectTests, UpdateFirstFrameWithExcessTime_ShouldUpdateTheSecondFrameWit
         }
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 6)));
     update_effects(11);
@@ -211,7 +211,7 @@ TEST_F(EffectTests, UpdatingWithBigEnoughDt_ShouldUpdateAllTheFramesBetween) {
         }
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 10))).Times(2);
     update_effects(26);
@@ -231,7 +231,7 @@ TEST_F(EffectTests, UpdatingInstantFrame_ShouldMoveToTheNextFrameWithoutUsingTim
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 0)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 2)));
     update_effects(2);
@@ -249,7 +249,7 @@ TEST_F(EffectTests, UpdatingInstantFrameAfterNormalWithExactTime_IsUpdatedToo) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 10)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0)));
     update_effects(10);
@@ -265,7 +265,7 @@ TEST_F(EffectTests, OneFrameInfiniteLoopingEffect_ShouldLoopCorrectly) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_LOOP_INFINITE);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_LOOP_INFINITE);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     update_effects(6);
@@ -282,7 +282,7 @@ TEST_F(EffectTests, OneFrameFixedLoop_ShouldLoopCorrectly) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, 2);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, 2);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
     update_effects(1);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5))).Times(2);
@@ -302,7 +302,7 @@ TEST_F(EffectTests, TwoFrameFixedLoop_ShouldLoopCorrectly) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, 3);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, 3);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
     EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0)));
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 1)));
@@ -322,7 +322,7 @@ TEST_F(EffectTests, EffectEntryAndExit_ShouldBeSetCorrectly) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::entry, true),
         Field(&effect_param_t::exit, false)
@@ -348,7 +348,7 @@ TEST_F(EffectTests, EffectEntryAndExit_CanBeSetAtTheSameTime) {
         },
     };
     effect_runtime_t runtime;
-    add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
+    add_effect(&runtime, frames, sizeof(frames), NULL, 0, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::entry, true),
         Field(&effect_param_t::exit, true)
@@ -373,15 +373,15 @@ TEST_F(EffectTests, UpdateTwoEffects_ShouldNotAffectEachOther) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames1, sizeof(frames1), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames2, sizeof(frames2), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames1, sizeof(frames1), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames2, sizeof(frames2), &data2, sizeof(data2), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update2(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(2);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 5)));
@@ -403,24 +403,24 @@ TEST_F(EffectTests, UpdateTwoEffectsWithSameFrames_ShouldGetDifferentUserData) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(2);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(6);
 }
@@ -436,11 +436,11 @@ TEST_F(EffectTests, RemoveFirstEffect_ShouldNotUpdateItAnymore) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
     remove_effect(&runtime1);
 
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data2)));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))));
     update_effects(1);
 }
 
@@ -455,11 +455,11 @@ TEST_F(EffectTests, RemoveLastEffect_ShouldNotUpdateItAnymore) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
     remove_effect(&runtime2);
 
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data1)));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))));
     update_effects(1);
 }
 
@@ -476,13 +476,13 @@ TEST_F(EffectTests, RemoveMiddleEffect_ShouldStillUpdateTheOthers) {
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
     effect_runtime_t runtime3;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
-    add_effect(&runtime3, frames, sizeof(frames), &data3, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
+    add_effect(&runtime3, frames, sizeof(frames), &data3, sizeof(data3), EFFECT_NO_LOOP);
     remove_effect(&runtime2);
 
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data1)));
-    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, &data3)));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))));
+    EXPECT_CALL(*mock, update1(Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data3)))));
     update_effects(1);
 }
 
@@ -497,27 +497,27 @@ TEST_F(EffectTests, ReAddFirstEffect_ShouldRestartIt) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
 
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(2);
 
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 3),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(5);
 }
@@ -533,27 +533,27 @@ TEST_F(EffectTests, ReAddLastEffect_ShouldRestartIt) {
     int data2 = 2;
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
 
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(2);
 
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 3),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     update_effects(5);
 }
@@ -571,36 +571,36 @@ TEST_F(EffectTests, ReAddMiddleEffect_ShouldRestartIt) {
     effect_runtime_t runtime1;
     effect_runtime_t runtime2;
     effect_runtime_t runtime3;
-    add_effect(&runtime1, frames, sizeof(frames), &data1, EFFECT_NO_LOOP);
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
-    add_effect(&runtime3, frames, sizeof(frames), &data3, EFFECT_NO_LOOP);
+    add_effect(&runtime1, frames, sizeof(frames), &data1, sizeof(data1), EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
+    add_effect(&runtime3, frames, sizeof(frames), &data3, sizeof(data3), EFFECT_NO_LOOP);
 
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 2),
-        Field(&effect_param_t::user_data, &data3)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data3)))
     )));
     update_effects(2);
 
-    add_effect(&runtime2, frames, sizeof(frames), &data2, EFFECT_NO_LOOP);
+    add_effect(&runtime2, frames, sizeof(frames), &data2, sizeof(data2), EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data1)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data1)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 3),
-        Field(&effect_param_t::user_data, &data2)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data2)))
     )));
     EXPECT_CALL(*mock, update1(AllOf(
         Field(&effect_param_t::current_frame_time, 5),
-        Field(&effect_param_t::user_data, &data3)
+        Field(&effect_param_t::user_data, MatcherCast<int*>(Pointee(data3)))
     )));
     update_effects(5);
 }

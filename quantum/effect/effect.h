@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define EFFECT_MAX_USERDATA_SIZE 32
+
 typedef struct {
     uint32_t duration;
     uint32_t current_frame_time;
@@ -26,8 +28,8 @@ typedef struct effect_runtime{
     uint32_t length;
     struct effect_runtime* next;
     effect_frame_t* frames;
-    void* user_data;
     uint16_t loop;
+    uint8_t userdata[EFFECT_MAX_USERDATA_SIZE];
 } effect_runtime_t;
 
 #define EFFECT_NO_LOOP 1
@@ -35,7 +37,7 @@ typedef struct effect_runtime{
 
 
 void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
-    uint16_t loops);
+    unsigned user_data_size, uint16_t loops);
 void remove_effect(effect_runtime_t* runtime);
 void clear_all_effects(void);
 void update_effects(uint16_t abstime);
