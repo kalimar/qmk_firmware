@@ -29,7 +29,7 @@ typedef struct effect_runtime{
     uint16_t loop;
 } effect_runtime_t;
 
-#define EFFECT_NO_LOOP 0
+#define EFFECT_NO_LOOP 1
 #define EFFECT_LOOP_INFINITE 0xFFFF
 
 
