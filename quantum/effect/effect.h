@@ -21,10 +21,11 @@ typedef struct {
 } effect_frame_t;
 
 typedef struct effect_runtime{
-    struct effect_runtime* next;
-    effect_frame_t* frames;
     uint32_t start_time;
     uint32_t num_frames;
+    uint32_t length;
+    struct effect_runtime* next;
+    effect_frame_t* frames;
     void* user_data;
     uint16_t loop;
 } effect_runtime_t;

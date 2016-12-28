@@ -237,7 +237,7 @@ TEST_F(EffectTests, UpdatingInstantFrame_ShouldMoveToTheNextFrameWithoutUsingTim
     update_effects(2);
 }
 
-TEST_F(EffectTests, UpdatingInstantFrameAfterNormalWithExactTime_IsUpdatedDuringTheNextUpdate) {
+TEST_F(EffectTests, UpdatingInstantFrameAfterNormalWithExactTime_IsUpdatedToo) {
     effect_frame_t frames[] = {
         {
             .duration = 10,
@@ -251,9 +251,9 @@ TEST_F(EffectTests, UpdatingInstantFrameAfterNormalWithExactTime_IsUpdatedDuring
     effect_runtime_t runtime;
     add_effect(&runtime, frames, sizeof(frames), NULL, EFFECT_NO_LOOP);
     EXPECT_CALL(*mock, update1(Field(&effect_param_t::current_frame_time, 10)));
+    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0)));
     update_effects(10);
     Mock::VerifyAndClearExpectations(mock);
-    EXPECT_CALL(*mock, update2(Field(&effect_param_t::current_frame_time, 0)));
     update_effects(20);
 }
 
