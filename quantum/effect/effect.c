@@ -5,6 +5,8 @@ static effect_runtime_t* active_effects = NULL;
 static uint16_t last_time = 0;
 static uint32_t current_time = 0;
 
+static effect_runtime_t runtimes[EFFECT_MAX_SLOTS];
+
 static uint32_t calculate_effect_length(effect_runtime_t* effect) {
     uint32_t effect_length = 0;
     for (int i=0; i<effect->num_frames; i++) {
@@ -13,11 +15,16 @@ static uint32_t calculate_effect_length(effect_runtime_t* effect) {
     return effect_length;
 }
 
-void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int frames_size, void* userdata,
+void add_effect(unsigned slot, effect_frame_t* frames, unsigned int frames_size, void* userdata,
     unsigned userdata_size, uint16_t loops) {
+
     if (userdata_size > EFFECT_MAX_USERDATA_SIZE) {
         return;
     }
+    if (slot >= EFFECT_MAX_SLOTS) {
+        return;
+    }
+    effect_runtime_t* runtime = &runtimes[slot];
     runtime->frames = frames;
     runtime->start_time = current_time;
     runtime->num_frames = frames_size / sizeof(effect_frame_t);
@@ -39,7 +46,11 @@ void add_effect(effect_runtime_t* runtime, effect_frame_t* frames, unsigned int 
     }
 }
 
-void remove_effect(effect_runtime_t* runtime) {
+void remove_effect(unsigned slot) {
+    if (slot >= EFFECT_MAX_SLOTS) {
+        return;
+    }
+    effect_runtime_t* runtime = &runtimes[slot];
     if (runtime == active_effects) {
         active_effects = active_effects->next;
     } else {
