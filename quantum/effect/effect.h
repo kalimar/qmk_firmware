@@ -23,16 +23,6 @@ typedef struct {
     effect_update_func_t update; // The update function
 } effect_frame_t;
 
-typedef struct effect_runtime{
-    uint32_t start_time;
-    uint32_t num_frames;
-    uint32_t length;
-    struct effect_runtime* next;
-    effect_frame_t* frames;
-    uint16_t loop;
-    uint8_t userdata[EFFECT_MAX_USERDATA_SIZE];
-} effect_runtime_t;
-
 #define EFFECT_NO_LOOP 1
 #define EFFECT_LOOP_INFINITE 0xFFFF
 

@@ -1,10 +1,25 @@
 #include "effect.h"
 #include <memory.h>
 
-static effect_runtime_t* active_effects = NULL;
 static uint16_t last_time = 0;
 static uint32_t current_time = 0;
 
+#if EFFECT_MAX_SLOTS > 32
+// The active_effects bitmask would need to be extended beyond 32 bits to support more
+#error "Only 32 effect slots supported at the moment"
+#endif
+
+typedef struct effect_runtime{
+    uint32_t start_time;
+    uint32_t num_frames;
+    uint32_t length;
+    effect_frame_t* frames;
+    uint16_t loop;
+    uint8_t userdata[EFFECT_MAX_USERDATA_SIZE];
+} effect_runtime_t;
+
+
+uint32_t active_effects = 0;
 static effect_runtime_t runtimes[EFFECT_MAX_SLOTS];
 
 static uint32_t calculate_effect_length(effect_runtime_t* effect) {
@@ -31,39 +46,18 @@ void add_effect(unsigned slot, effect_frame_t* frames, unsigned int frames_size,
     memcpy(runtime->userdata,  userdata, userdata_size);
     runtime->loop = loops;
     runtime->length = calculate_effect_length(runtime);
-    if (!active_effects) {
-        active_effects = runtime;
-        runtime->next = NULL;
-    } else {
-        effect_runtime_t* prev = active_effects;
-        while (prev->next && prev != runtime) {
-            prev = prev->next;
-        }
-        if (prev != runtime) {
-            prev->next = runtime;
-            runtime->next = NULL;
-        }
-    }
+    active_effects |= 1u << slot;
 }
 
 void remove_effect(unsigned slot) {
     if (slot >= EFFECT_MAX_SLOTS) {
         return;
     }
-    effect_runtime_t* runtime = &runtimes[slot];
-    if (runtime == active_effects) {
-        active_effects = active_effects->next;
-    } else {
-        effect_runtime_t* effect = active_effects;
-        if (effect->next == runtime) {
-            effect->next = effect->next->next;
-            return;
-        }
-    }
+    active_effects &= ~(1u << slot);
 }
 
 void clear_all_effects(void) {
-    active_effects = NULL;
+    active_effects = 0;
 }
 
 static void seek(effect_runtime_t* effect, uint32_t time, unsigned* frame, uint32_t* time_left_in_frame) {
@@ -132,20 +126,14 @@ void update_effects(uint16_t abstime) {
         dt = 1000;
     }
     last_time = abstime;
-    effect_runtime_t* effect = active_effects;
-    effect_runtime_t* prev_effect = NULL;
-    while(effect) {
-        bool effect_finished = update_effect(current_time, dt, effect);
-        if (effect_finished) {
-            if (prev_effect) {
-                prev_effect->next = effect->next;
-            }
-            else {
-                active_effects = effect->next;
+    for (unsigned i = 0; i < EFFECT_MAX_SLOTS; i++) {
+        if (active_effects & (1u << i)) {
+            effect_runtime_t* effect = &runtimes[i];
+            bool effect_finished = update_effect(current_time, dt, effect);
+            if (effect_finished) {
+                remove_effect(i);
             }
         }
-        prev_effect = effect;
-        effect = effect->next;
     }
     current_time += dt;
 }
