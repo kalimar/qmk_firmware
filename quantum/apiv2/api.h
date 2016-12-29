@@ -21,6 +21,8 @@
 #include <stdbool.h>
 
 bool api_connect(uint8_t endpoint);
+bool api_is_connected(uint8_t endpoint);
+void api_reset(void);
 
 typedef struct {
     bool (*connect)(uint8_t endpoint);

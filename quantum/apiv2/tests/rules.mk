@@ -14,5 +14,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 api_SRC := $(API2_PATH)/tests/api_tests.cpp $(API2_SRC)
-api_DEFS := $(API2_DEFS)
+api_DEFS := $(API2_DEFS) -DAPI_MAX_CONNECTED_ENDPOINTS=8
 api_INC := $(API2_PATH)

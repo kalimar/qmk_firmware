@@ -69,24 +69,38 @@ private:
 template<size_t id>
 DriverMock<id>* DriverMock<id>::s_instance = nullptr;
 
-TEST(Api, ConnectingToANonRegisteredEndpointFails) {
+class Api : public testing::Test
+{
+public:
+    Api() {
+        api_reset();
+    }
+};
+
+TEST_F(Api, ConnectingToANonRegisteredEndpointFails) {
+    EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(nullptr));
     EXPECT_FALSE(api_connect(3));
+    EXPECT_FALSE(api_is_connected(3));
 }
 
-TEST(Api, ASuccessfulConnection) {
+TEST_F(Api, ASuccessfulConnection) {
+    EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     DriverMock<1> driver;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(&driver));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
     EXPECT_TRUE(api_connect(3));
+    EXPECT_TRUE(api_is_connected(3));
 }
 
-TEST(Api, AFailedConnection) {
+TEST_F(Api, AFailedConnection) {
+    EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     DriverMock<1> driver;
-    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(&driver));
-    EXPECT_CALL(driver, connect(1)).WillOnce(Return(false));
-    EXPECT_FALSE(api_connect(1));
+    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(3)).WillOnce(Return(false));
+    EXPECT_FALSE(api_connect(3));
+    EXPECT_FALSE(api_is_connected(3));
 }
