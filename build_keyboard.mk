@@ -132,11 +132,26 @@ ifndef CUSTOM_MATRIX
 endif
 
 ifeq ($(strip $(API_SYSEX_ENABLE)), yes)
-	OPT_DEFS += -DAPI_SYSEX_ENABLE
-	SRC += $(QUANTUM_DIR)/api/api_sysex.c
-	OPT_DEFS += -DAPI_ENABLE
-	SRC += $(QUANTUM_DIR)/api.c
+	SRC += $(patsubst $(QUANTUM_PATH)/%,%,$(APISYSEX_SRC))
+	OPT_DEFS += $(APISYSEX_DEFS)
+	COMMON_VPATH += $(APISYSEX_PATH)
     MIDI_ENABLE=yes
+    API_ENABLE=yes
+endif
+
+ifeq ($(strip $(API_ENABLE)), yes)
+    SRC += $(patsubst $(QUANTUM_PATH)/%,%,$(API_SRC))
+    OPT_DEFS += $(API_DEFS)
+    COMMON_VPATH += $(API_PATH)
+endif
+
+ifeq ($(strip $(API2_ENABLE)), yes)
+    ifeq ($(strip $(API2_ENABLE)), yes)
+        $(error You can not enable both API2 and API at the same time)
+    endif
+    SRC += $(patsubst $(QUANTUM_PATH)/%,%,$(API2_SRC))
+    OPT_DEFS += $(API2_DEFS)
+   COMMON_VPATH += $(API2_PATH)
 endif
 
 ifeq ($(strip $(MIDI_ENABLE)), yes)
