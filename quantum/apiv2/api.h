@@ -17,6 +17,16 @@
 #ifndef QUANTUM_APIV2_API_H_
 #define QUANTUM_APIV2_API_H_
 
+#include <stdint.h>
+#include <stdbool.h>
 
+bool api_connect(uint8_t endpoint);
+
+typedef struct {
+    bool (*connect)(uint8_t endpoint);
+}api_driver_t;
+
+// The keyboard should implement this, you can return NULL for unsupported endpoints
+api_driver_t* api_get_driver(uint8_t endpoint);
 
 #endif /* QUANTUM_APIV2_API_H_ */

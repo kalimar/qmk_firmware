@@ -21,6 +21,72 @@ extern "C" {
 #include "api.h"
 }
 
+using testing::_;
+using testing::Return;
 
-TEST(Api, Dummy) {
+class GetDriverMock {
+public:
+    GetDriverMock() { s_instance = this; }
+    ~GetDriverMock() { s_instance = nullptr; }
+    MOCK_METHOD1(get_driver, api_driver_t* (uint8_t));
+
+    static GetDriverMock* s_instance;
+};
+
+GetDriverMock* GetDriverMock::s_instance = nullptr;
+
+api_driver_t* api_get_driver(uint8_t endpoint) {
+    if (GetDriverMock::s_instance) {
+        return GetDriverMock::s_instance->get_driver(endpoint);
+    }
+    else {
+        return nullptr;
+    }
+}
+
+
+template<size_t id>
+class DriverMock : public api_driver_t {
+public:
+    DriverMock() {
+        api_driver_t::connect = [](uint8_t endpoint) {
+            if (DriverMock::s_instance) {
+                return DriverMock::s_instance->connect(endpoint);
+            } else {
+                return false;
+            }
+        };
+        s_instance = this;
+    }
+    ~DriverMock() {
+        s_instance = nullptr;
+    }
+    MOCK_METHOD1(connect, bool (uint8_t endpoint));
+private:
+    static DriverMock* s_instance;
+};
+
+template<size_t id>
+DriverMock<id>* DriverMock<id>::s_instance = nullptr;
+
+TEST(Api, ConnectingToANonRegisteredEndpointFails) {
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_FALSE(api_connect(3));
+}
+
+TEST(Api, ASuccessfulConnection) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
+    EXPECT_TRUE(api_connect(3));
+}
+
+TEST(Api, AFailedConnection) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(1)).WillOnce(Return(false));
+    EXPECT_FALSE(api_connect(1));
 }

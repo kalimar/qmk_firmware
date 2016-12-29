@@ -15,3 +15,13 @@
 */
 
 #include "api.h"
+#include <stddef.h>
+
+bool api_connect(uint8_t endpoint) {
+    api_driver_t* driver = api_get_driver(endpoint);
+    if (driver) {
+        return driver->connect(endpoint);
+    }
+    return driver != NULL;
+}
+
