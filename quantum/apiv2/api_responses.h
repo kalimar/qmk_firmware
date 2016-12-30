@@ -20,7 +20,7 @@
 // See api_requests.h for documentation of how to add new responses
 
 typedef struct __attribute((packed, aligned(4))) {
-
+    uint8_t successful;
 } res_connect;
 
 

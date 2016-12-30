@@ -32,8 +32,13 @@ typedef struct {
     // * The call should be non-blocking, and can be called multiple times until it succeeds.
     // * The driver can perform the connecting in the background and return true when it succeeds.
     // * Either physical or transport level connection can be skipped if the driver don't need to do that
-    // * Once the connection has succeeded, a relaible communication channel should be established.
+    // * Once the connection has succeeded, a reliable communication channel should be established.
+    // * Note, you are only allowed to connect to endpoints with a lower id than yourself, this to prevent
+    //   some race conditions in the connection protocol
     bool (*connect)(uint8_t endpoint);
+
+    bool (*send_and_receive_response)(uint8_t endpoint, void* send_buffer, uint8_t send_size,
+        void* recv_buffer, uint8_t recv_size);
 }api_driver_t;
 
 // The keyboard should implement this, you can return NULL for unsupported endpoints
