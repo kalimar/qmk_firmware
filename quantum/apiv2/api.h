@@ -19,12 +19,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "api_commands.h"
+#include "api_requests.h"
+#include "api_responses.h"
 
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
 void api_reset(void);
 
 typedef struct {
+    // * This should start initiating a physical and transport level connection to the the endpoint.
+    // * The call should be non-blocking, and can be called multiple times until it succeeds.
+    // * The driver can perform the connecting in the background and return true when it succeeds.
+    // * Either physical or transport level connection can be skipped if the driver don't need to do that
+    // * Once the connection has succeeded, a relaible communication channel should be established.
     bool (*connect)(uint8_t endpoint);
 }api_driver_t;
 
