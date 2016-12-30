@@ -33,37 +33,46 @@ static connected_endpoint_t connected_endpoints[API_MAX_CONNECTED_ENDPOINTS] = {
 connected_endpoint_t* get_endpoint(uint8_t endpoint) {
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
         connected_endpoint_t* e = &connected_endpoints[i];
-        if (e->is_valid) {
+        if (e->is_valid && e->endpoint == endpoint) {
             return e;
         }
     }
     return NULL;
 }
 
-connected_endpoint_t* add_endpoint(uint8_t endpoint) {
+connected_endpoint_t* get_or_create_endpoint(uint8_t endpoint) {
+    connected_endpoint_t* free_endpoint = NULL;
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
         connected_endpoint_t* e = &connected_endpoints[i];
-        if (!e->is_valid) {
-            e->is_valid = true;
+        if (!e->is_valid && free_endpoint == NULL) {
+            free_endpoint = e;
+        }
+        else if(e->is_valid && e->endpoint == endpoint) {
             return e;
         }
     }
-    return NULL;
+    if (free_endpoint) {
+        free_endpoint->endpoint = endpoint;
+    }
+    return free_endpoint;
 }
 
 
 bool api_connect(uint8_t endpoint) {
+    // TODO: handle out of endpoints
+    connected_endpoint_t* e = get_or_create_endpoint(endpoint);
+    if (e->is_valid) {
+        return true;
+    }
     api_driver_t* driver = api_get_driver(endpoint);
     if (driver) {
-        connected_endpoint_t* e = add_endpoint(endpoint);
-        // TODO: handle out of endpoints
         bool connected =  driver->connect(endpoint);
-        if (!connected) {
-            e->is_valid = false;
-        }
+        e->is_valid = connected;
         return connected;
     }
-    return driver != NULL;
+    else {
+        return false;
+    }
 }
 
 bool api_is_connected(uint8_t endpoint) {

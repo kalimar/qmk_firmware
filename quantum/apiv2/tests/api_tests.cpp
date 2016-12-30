@@ -93,6 +93,8 @@ TEST_F(Api, ASuccessfulConnection) {
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
     EXPECT_TRUE(api_connect(3));
     EXPECT_TRUE(api_is_connected(3));
+    // Another endpoint is should not connected
+    EXPECT_FALSE(api_is_connected(2));
 }
 
 TEST_F(Api, AFailedConnection) {
@@ -103,4 +105,22 @@ TEST_F(Api, AFailedConnection) {
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(false));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
+}
+
+TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(1)).Times(1).WillRepeatedly(Return(true));
+    EXPECT_TRUE(api_connect(1));
+    EXPECT_TRUE(api_connect(1));
+}
+
+TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(1)).Times(2).WillOnce(Return(false)).WillOnce(Return(true));
+    EXPECT_FALSE(api_connect(1));
+    EXPECT_TRUE(api_connect(1));
 }
