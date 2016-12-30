@@ -124,3 +124,18 @@ TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
     EXPECT_FALSE(api_connect(1));
     EXPECT_TRUE(api_connect(1));
 }
+
+TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(&driver));
+    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
+    for (int i = 0; i < API_MAX_CONNECTED_ENDPOINTS; i++) {
+        EXPECT_TRUE(api_connect(i));
+    }
+    EXPECT_FALSE(api_connect(API_MAX_CONNECTED_ENDPOINTS));
+    for (int i = 0; i < API_MAX_CONNECTED_ENDPOINTS; i++) {
+        EXPECT_TRUE(api_is_connected(i));
+    }
+    EXPECT_FALSE(api_is_connected(API_MAX_CONNECTED_ENDPOINTS));
+}

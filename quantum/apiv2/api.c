@@ -59,8 +59,10 @@ connected_endpoint_t* get_or_create_endpoint(uint8_t endpoint) {
 
 
 bool api_connect(uint8_t endpoint) {
-    // TODO: handle out of endpoints
     connected_endpoint_t* e = get_or_create_endpoint(endpoint);
+    if (!e) {
+        return false;
+    }
     if (e->is_valid) {
         return true;
     }
