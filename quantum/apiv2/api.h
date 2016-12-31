@@ -19,6 +19,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#define BEGIN_MSG typedef struct __attribute((packed, aligned(4))) { \
+    uint16_t id : 15; \
+    uint16_t is_response : 1;
+
+#define END_MSG(name) } name;
 #include "api_commands.h"
 #include "api_requests.h"
 #include "api_responses.h"
@@ -37,11 +42,24 @@ typedef struct {
     //   some race conditions in the connection protocol
     bool (*connect)(uint8_t endpoint);
 
-    bool (*send_and_receive_response)(uint8_t endpoint, void* send_buffer, uint8_t send_size,
-        void* recv_buffer, uint8_t recv_size);
+    // * Should perform a blocking send, but doesn't need to wait for the confirmation of the other side.
+    // * If it can't physically send yet, it could just save the buffer for later use
+    // * Should return false only if the link is or gets disconnected during the send
+    bool (*send)(uint8_t endpoint, void* buffer, uint8_t size);
+
+    // * Should return a buffer if data was received, it then also sets the endpoint and the size
+    // * If endpoint is specified, should perform a blocking read, that is ended by the following condtions
+    //   1. Data is received from the specified endpoint
+    //   2. Data is received from another endpoint on the same driver
+    //   3. The specified endpoint is disconnected
+    // * When no endpoint is specified, it should perform a non-blocking read
+    // * Returns NULL if there's no data to be read, or if the specified endpoint is disconnected
+    // * The returned buffer should be valid at least until the next send or recv is performed on the driver
+    void* (*recv)(uint8_t* endpoint, uint8_t* size);
 }api_driver_t;
 
 // The keyboard should implement this, you can return NULL for unsupported endpoints
 api_driver_t* api_get_driver(uint8_t endpoint);
+
 
 #endif /* QUANTUM_APIV2_API_H_ */

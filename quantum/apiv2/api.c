@@ -71,11 +71,13 @@ bool api_connect(uint8_t endpoint) {
         bool connected =  driver->connect(endpoint);
         if (connected) {
             req_connect connect_req;
-            res_connect connect_resp;
-            connected = driver->send_and_receive_response(endpoint, &connect_req, sizeof(connect_req),
-                &connect_resp, sizeof(connect_resp));
+            connected = driver->send(endpoint, &connect_req, sizeof(connect_req));
             if (connected) {
-                connected = connect_resp.successful;
+                uint8_t recv_endpoint = endpoint;
+                uint8_t recv_size;
+                void* res = driver->recv(&recv_endpoint, &recv_size);
+                res_connect* connect_resp = (res_connect*)res;
+                connected = connect_resp->successful;
             }
         }
         e->is_valid = connected;

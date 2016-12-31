@@ -19,9 +19,9 @@
 
 // See api_requests.h for documentation of how to add new responses
 
-typedef struct __attribute((packed, aligned(4))) {
+BEGIN_MSG
     uint8_t successful;
-} res_connect;
+END_MSG(res_connect);
 
 
 #endif /* QUANTUM_APIV2_API_RESPONSES_H_ */

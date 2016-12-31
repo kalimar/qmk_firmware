@@ -17,10 +17,11 @@
 #ifndef QUANTUM_APIV2_API_REQUESTS_H_
 #define QUANTUM_APIV2_API_REQUESTS_H_
 
-// The requests and responses should always be defined as
-// typedef struct __attribute((packed, aligned(4))) {
-//     fields
-// }; req_name
+// The requests and responses should always be defined like this
+// BEGIN_MSG
+//     uint8_t field1;
+//     uint16_t field2;
+// END_MSG(req_name);
 // Where name should match the command id, in commands.h
 // for respones use res_name instead of req_name
 
@@ -71,8 +72,8 @@
 // Finally you can of course use uint8_t buffers and manual serialization, but that's not recommended
 
 
-typedef struct __attribute((packed, aligned(4))) {
+BEGIN_MSG
     uint8_t protocol_version;
-} req_connect;
+END_MSG(req_connect);
 
 #endif /* QUANTUM_APIV2_API_REQUESTS_H_ */

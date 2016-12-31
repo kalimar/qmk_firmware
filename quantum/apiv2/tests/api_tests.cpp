@@ -52,14 +52,17 @@ template<size_t id>
 class DriverMock {
 public:
     DriverMock() {
-        m_driver.connect = [](uint8_t endpoint) {
+        m_driver.connect =
+        [](uint8_t endpoint) {
             return DriverMock::s_instance->connect(endpoint);
         };
-        m_driver.send_and_receive_response =
-        []
-        (uint8_t endpoint, void* send_buffer, uint8_t send_size, void* recv_buffer, uint8_t recv_size) {
-            return DriverMock::s_instance->send_and_receive_response(endpoint, send_buffer, send_size,
-                recv_buffer, recv_size);
+        m_driver.send =
+        [](uint8_t endpoint, void* buffer, uint8_t size) {
+            return DriverMock::s_instance->send(endpoint, buffer, size);
+        };
+        m_driver.recv =
+        [](uint8_t* endpoint, uint8_t* size) {
+            return DriverMock::s_instance->recv(endpoint, size);
         };
         s_instance = this;
     }
@@ -70,8 +73,8 @@ public:
 
 
     MOCK_METHOD1(connect, bool (uint8_t endpoint));
-    MOCK_METHOD5(send_and_receive_response, bool (uint8_t endpoint, void* send_buffer, uint8_t send_size,
-        void* recv_buffer, uint8_t recv_size));
+    MOCK_METHOD3(send, bool (uint8_t endpoint, void* buffer, uint8_t size));
+    MOCK_METHOD2(recv, void* (uint8_t* endpoint, uint8_t* size));
 private:
     static DriverMock* s_instance;
     api_driver_t m_driver;
@@ -100,14 +103,12 @@ TEST_F(Api, ASuccessfulConnection) {
     EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     DriverMock<1> driver;
+    res_connect resp;
+    resp.successful = 1;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send_and_receive_response(3, _, _, _, _)).WillOnce(
-        WithArg<3>(Invoke([](void* v) {
-            static_cast<res_connect*>(v)->successful = 1;
-            return true;
-        }))
-    );
+    EXPECT_CALL(driver, send(3, _, _)).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv( _, _)).WillOnce(Return(&resp));
     EXPECT_TRUE(api_connect(3));
     EXPECT_TRUE(api_is_connected(3));
     // Another endpoint should not be connected
@@ -130,7 +131,7 @@ TEST_F(Api, AFailedConnectionThroughFailureDuringConnectionPacketSendAndReceive)
     DriverMock<1> driver;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send_and_receive_response(3, _, _, _, _)).WillOnce(Return(false));
+    EXPECT_CALL(driver, send(3, _, _)).WillOnce(Return(false));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
@@ -139,14 +140,12 @@ TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
     EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     DriverMock<1> driver;
+    res_connect resp;
+    resp.successful = 0;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send_and_receive_response(3, _, _, _, _)).WillOnce(
-        WithArg<3>(Invoke([](void* v) {
-            static_cast<res_connect*>(v)->successful = 0;
-            return true;
-        }))
-    );
+    EXPECT_CALL(driver, send(3, _, _)).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(_, _)).WillOnce(Return(&resp));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
@@ -154,14 +153,12 @@ TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
 TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
     GetDriverMock mock;
     DriverMock<1> driver;
+    res_connect resp;
+    resp.successful = 1;
     EXPECT_CALL(mock, get_driver(1)).WillOnce(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, send_and_receive_response(1, _, _, _, _)).WillOnce(
-        WithArg<3>(Invoke([](void* v) {
-            static_cast<res_connect*>(v)->successful = 1;
-            return true;
-        }))
-    );
+    EXPECT_CALL(driver, send(1, _, _)).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(_, _)).WillOnce(Return(&resp));
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_connect(1));
 }
@@ -169,29 +166,25 @@ TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
 TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
     GetDriverMock mock;
     DriverMock<1> driver;
+    res_connect resp;
+    resp.successful = 1;
     EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(1)).Times(2).WillOnce(Return(false)).WillOnce(Return(true));
     EXPECT_FALSE(api_connect(1));
-    EXPECT_CALL(driver, send_and_receive_response(1, _, _, _, _)).WillOnce(
-        WithArg<3>(Invoke([](void* v) {
-            static_cast<res_connect*>(v)->successful = 1;
-            return true;
-        }))
-    );
+    EXPECT_CALL(driver, send(1, _, _)).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(_, _)).WillOnce(Return(&resp));
     EXPECT_TRUE(api_connect(1));
 }
 
 TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
     GetDriverMock mock;
     DriverMock<1> driver;
+    res_connect resp;
+    resp.successful = 1;
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, send_and_receive_response(_, _, _, _, _)).WillRepeatedly(
-        WithArg<3>(Invoke([](void* v) {
-            static_cast<res_connect*>(v)->successful = 1;
-            return true;
-        }))
-    );
+    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver, recv(_, _)).WillRepeatedly(Return(&resp));
     for (int i = 0; i < API_MAX_CONNECTED_ENDPOINTS; i++) {
         EXPECT_TRUE(api_connect(i));
     }
