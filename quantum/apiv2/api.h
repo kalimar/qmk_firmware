@@ -19,11 +19,34 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#define BEGIN_MSG typedef struct __attribute((packed, aligned(4))) { \
+
+#define API_ALIGN 4
+
+// The first two bytes of this structure can never change
+// But you could potentially add more fields if the protocol version is bumped
+typedef struct __attribute__((packed, aligned(API_ALIGN))) {
+    uint16_t id : 15;
+    uint16_t is_response : 1;
+} api_packet_t;
+
+// Note, this define has to match the api_packet_t above
+#define BEGIN_MSG typedef struct __attribute__((packed, aligned(API_ALIGN))) { \
     uint16_t id : 15; \
     uint16_t is_response : 1;
 
 #define END_MSG(name) } name;
+
+#define API_HANDLE(id, function) \
+case api_command_##id: \
+    if (sizeof(req_##id) == size) { \
+        req_##id* request = (req_##id*)(buffer); \
+        res_##id response; \
+        function(endpoint, request, &response); \
+        api_internal_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
+        break; \
+    }
+
+
 #include "api_commands.h"
 #include "api_requests.h"
 #include "api_responses.h"
@@ -31,6 +54,7 @@
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
 void api_reset(void);
+
 
 typedef struct {
     // * This should start initiating a physical and transport level connection to the the endpoint.
@@ -55,11 +79,25 @@ typedef struct {
     // * When no endpoint is specified, it should perform a non-blocking read
     // * Returns NULL if there's no data to be read, or if the specified endpoint is disconnected
     // * The returned buffer should be valid at least until the next send or recv is performed on the driver
+    // * Note the returned data has to be aligned to 4 bytes
     void* (*recv)(uint8_t* endpoint, uint8_t* size);
 }api_driver_t;
 
 // The keyboard should implement this, you can return NULL for unsupported endpoints
 api_driver_t* api_get_driver(uint8_t endpoint);
+
+// * The keyboard should call this when an incoming packet is received
+// * Typically this would be implemented by iterating all the drivers onece every scan loop and call recv with
+//   a NULL endpoint. If data is received, then you call api_add_packet.
+// * The lifetime for the buffer pointer is the same as the driver, which means that it doesn't necessarily
+//   even have to be valid until the function returns
+// * NOTE: You have to be careful about race conditions, so don't call this directly from an interrupt or
+//   another thread as soon as a packet is received.
+// * Also don't call this function as a response to another driver request, like recv
+void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size);
+
+
+void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size);
 
 
 #endif /* QUANTUM_APIV2_API_H_ */

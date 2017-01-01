@@ -98,3 +98,34 @@ void api_reset(void) {
         e->is_valid = false;
     }
 }
+
+static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_connect* resp) {
+    resp->successful = req->protocol_version == API_PROTOCOL_VERSION;
+}
+
+void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
+    if (size < sizeof(api_packet_t) ) {
+        return;
+    }
+    if (((uintptr_t)(buffer) % API_ALIGN) != 0) {
+        return;
+    }
+    api_packet_t* packet = (api_packet_t*)(buffer);
+    // We should not receive responses if we are not waiting for it
+    if (packet->is_response) {
+        return;
+    }
+    switch(packet->id) {
+        API_HANDLE(connect, process_incoming_connect);
+    }
+}
+
+void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size) {
+    api_driver_t* driver = api_get_driver(endpoint);
+    if (driver) {
+        api_packet_t* packet = (api_packet_t*)(buffer);
+        packet->id = id;
+        packet->is_response = true;
+        driver->send(endpoint, packet, size);
+    }
+}

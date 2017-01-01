@@ -18,15 +18,15 @@
 #define QUANTUM_APIV2_API_COMMANDS_H_
 
 enum api_commands {
-    API_QMK_BEGIN=0,
+    api_qmk_begin=0,
     // Don't add anything before this line
-    API_CONNECT,
+    api_command_connect,
     // Don't add anything after this here, define another enum in your keyboard or keymap instead
-    API_QMK_END = 8191,
-    API_KEYBOARD_BEGIN = 8192,
-    API_KEYBOARD_END = 16383,
-    API_KEYMAP_BEGIN = 16384,
-    API_KEYMAP_END = 24575,
+    api_qmk_end = 8191,
+    api_keyboard_begin = 8192,
+    api_keyboard_end = 16383,
+    api_keymap_begin = 16384,
+    api_keymap_end = 24575,
 };
 
 

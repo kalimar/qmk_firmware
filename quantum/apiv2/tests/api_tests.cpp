@@ -26,6 +26,23 @@ using testing::Return;
 using testing::DoAll;
 using testing::Invoke;
 using testing::WithArg;
+using testing::MatcherCast;
+using testing::Pointee;
+using testing::Field;
+using testing::AllOf;
+using testing::PrintToString;
+
+MATCHER(CommandIsResponse, "The command is a response") {
+    return arg->is_response;
+}
+
+MATCHER(CommandIsRequest, "The command is a request") {
+    return !arg->is_response;
+}
+
+MATCHER_P(CommandIs, id, std::string("The command is " + PrintToString(id))) {
+    return arg->id == id;
+}
 
 class GetDriverMock {
 public:
@@ -193,4 +210,47 @@ TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
         EXPECT_TRUE(api_is_connected(i));
     }
     EXPECT_FALSE(api_is_connected(API_MAX_CONNECTED_ENDPOINTS));
+}
+
+TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    req_connect req;
+    req.id = api_command_connect;
+    req.is_response = 0;
+    req.protocol_version = API_PROTOCOL_VERSION;
+    EXPECT_CALL(mock, get_driver(5)).WillRepeatedly(Return(driver.get_driver()));
+    //EXPECT_CALL(driver, send(5, MatcherCast<void*>(MatcherCast<res_connect*>(Pointee(expected_response))), sizeof(res_connect))).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver,
+        send(5,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                Field(&res_connect::successful, 1),
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect)))
+    .Times(1).WillOnce(Return(true));
+    api_add_packet(5, &req, sizeof(req));
+}
+
+
+TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    req_connect req;
+    req.id = api_command_connect;
+    req.is_response = 0;
+    req.protocol_version = 0xDEAD;
+    EXPECT_CALL(mock, get_driver(5)).WillRepeatedly(Return(driver.get_driver()));
+    //EXPECT_CALL(driver, send(5, MatcherCast<void*>(MatcherCast<res_connect*>(Pointee(expected_response))), sizeof(res_connect))).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver,
+        send(5,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                Field(&res_connect::successful, 0),
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect)))
+    .Times(1).WillOnce(Return(true));
+    api_add_packet(5, &req, sizeof(req));
 }

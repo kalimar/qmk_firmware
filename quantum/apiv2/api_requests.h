@@ -25,6 +25,14 @@
 // Where name should match the command id, in commands.h
 // for respones use res_name instead of req_name
 
+// This translates into the following
+// typedef struct __attribute__((packed, aligned(API_ALIGN))) {
+//     uint16_t id : 15;
+//     uint16_t is_response : 1;
+//     uint8_t field1;
+//     uint16_t field2;
+//  } req_name;
+
 // You are only allowed to define the following field types
 // uint8_t
 // int8_t
@@ -70,6 +78,9 @@
 // Unions are also well defined, as long as any nested structs are packed.
 
 // Finally you can of course use uint8_t buffers and manual serialization, but that's not recommended
+
+// Also notice the alignment requirements above. This also means that all packets have to be padded to be
+// divisible by the API_ALIGNMENT.
 
 
 BEGIN_MSG
