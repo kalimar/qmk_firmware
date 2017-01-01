@@ -62,8 +62,10 @@ typedef struct {
     // * The driver can perform the connecting in the background and return true when it succeeds.
     // * Either physical or transport level connection can be skipped if the driver don't need to do that
     // * Once the connection has succeeded, a reliable communication channel should be established.
-    // * Note, you are only allowed to connect to endpoints with a lower id than yourself, this to prevent
-    //   some race conditions in the connection protocol
+    // * Note, the connections are unidirectional, so even if a one way connection is not established, the
+    //   connection in the opposite direction doesn't have to be. If the other side need to send commands, it
+    //   needs to connect too. The same thing applies to disconnect, the connection could be disconnected in
+    //   one direction but not the other.
     bool (*connect)(uint8_t endpoint);
 
     // * Should perform a blocking send, but doesn't need to wait for the confirmation of the other side.

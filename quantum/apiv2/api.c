@@ -79,6 +79,13 @@ bool api_connect(uint8_t endpoint) {
                 uint8_t recv_endpoint = endpoint;
                 uint8_t recv_size;
                 api_packet_t* res = (api_packet_t*)driver->recv(&recv_endpoint, &recv_size);
+                if (recv_size >= sizeof(api_packet_t)) {
+                    if (res->is_response == false) {
+                        api_add_packet(recv_endpoint, res, recv_size);
+                        continue;
+                    }
+                }
+
                 if (recv_endpoint == endpoint) {
                     connected = false;
                     if (res && recv_size == sizeof(res_connect) && res->id == api_command_connect) {

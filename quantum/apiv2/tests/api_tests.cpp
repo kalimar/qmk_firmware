@@ -31,6 +31,7 @@ using testing::Pointee;
 using testing::Field;
 using testing::AllOf;
 using testing::PrintToString;
+using testing::InSequence;
 
 MATCHER(CommandIsResponse, "The command is a response") {
     return arg->is_response;
@@ -121,6 +122,7 @@ TEST_F(Api, ASuccessfulConnection) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
@@ -174,6 +176,7 @@ TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 0;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
@@ -195,6 +198,7 @@ TEST_F(Api, AConnectionFailsWhenTheWrongTypeOfResponseIsReceived) {
     DriverMock<1> driver;
     // Use the same type of packet so that we know if the id really is checked
     res_connect resp;
+    resp.is_response = 1;
     resp.id = 0xDEAD;
     resp.is_response = 1;
     resp.successful = 1;
@@ -217,6 +221,7 @@ TEST_F(Api, AConnectionFailsWhenTheResponseHasTheWrongSize) {
     DriverMock<1> driver;
     // Use the same type of packet so that we know if the id really is checked
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.is_response = 1;
     resp.successful = 1;
@@ -249,6 +254,7 @@ TEST_F(Api, ReceivingAResponseFromAnUnrelatedEndpointDoesNothing) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
@@ -278,6 +284,7 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionRespon
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
@@ -317,10 +324,12 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseF
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
 
     res_connect general_response;
+    general_response.is_response = 1;
     general_response.id = 0xDEAD;
     general_response.successful = 1;
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
@@ -361,6 +370,7 @@ TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(1)).WillOnce(Return(driver.get_driver()));
@@ -381,6 +391,7 @@ TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
@@ -401,6 +412,7 @@ TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
     GetDriverMock mock;
     DriverMock<1> driver;
     res_connect resp;
+    resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
@@ -430,7 +442,6 @@ TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
     req.is_response = 0;
     req.protocol_version = API_PROTOCOL_VERSION;
     EXPECT_CALL(mock, get_driver(5)).WillRepeatedly(Return(driver.get_driver()));
-    //EXPECT_CALL(driver, send(5, MatcherCast<void*>(MatcherCast<res_connect*>(Pointee(expected_response))), sizeof(res_connect))).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver,
         send(5,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
@@ -463,3 +474,111 @@ TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
     .Times(1).WillOnce(Return(true));
     api_add_packet(5, &req, sizeof(req));
 }
+
+TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    res_connect resp;
+    resp.is_response = true;
+    resp.id = api_command_connect;
+    resp.successful = 1;
+
+    req_connect req;
+    req.is_response = false;
+    req.id = api_command_connect;
+    req.protocol_version = API_PROTOCOL_VERSION;
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
+    InSequence s;
+    // Connect the endpoint
+    EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
+    // Send the request
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
+                CommandIsRequest(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(req_connect))
+    ).Times(1).WillOnce(Return(true));
+    // Receive the connection request from the remote, before we have received our response
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&req](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(req);
+            return &req;
+        }
+    ));
+    // Send the response
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect))
+    ).Times(1);
+    // Receive the response for our outgoing request
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
+    EXPECT_TRUE(api_connect(1));
+}
+
+TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    res_connect resp;
+    resp.is_response = true;
+    resp.id = api_command_connect;
+    resp.successful = 1;
+
+    req_connect req;
+    req.is_response = false;
+    req.id = api_command_connect;
+    req.protocol_version = API_PROTOCOL_VERSION;
+    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
+    InSequence s;
+    // Connect the endpoint
+    EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
+    // Send the request
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
+                CommandIsRequest(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(req_connect))
+    ).Times(1).WillOnce(Return(true));
+    // Receive the connection request from the remote, before we have received our response
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&req](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 2;
+            *size = sizeof(req);
+            return &req;
+        }
+    ));
+    // Send the response
+    EXPECT_CALL(driver,
+        send(2,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect))
+    ).Times(1);
+    // Receive the response for our outgoing request
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
+    EXPECT_TRUE(api_connect(1));
+}
+
+// TODO: Add tests for other requests during connect
