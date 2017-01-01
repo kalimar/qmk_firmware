@@ -135,7 +135,13 @@ TEST_F(Api, ASuccessfulConnection) {
             sizeof(req_connect))
         )
         .Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv( Pointee(3), _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(Pointee(3), _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 3;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_TRUE(api_connect(3));
     EXPECT_TRUE(api_is_connected(3));
     // Another endpoint should not be connected
@@ -173,7 +179,13 @@ TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
     EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 3;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
@@ -189,7 +201,35 @@ TEST_F(Api, AConnectionFailsWhenTheWrongTypeOfResponseIsReceived) {
     EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
     EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 3;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
+    EXPECT_FALSE(api_connect(3));
+    EXPECT_FALSE(api_is_connected(3));
+}
+
+TEST_F(Api, AConnectionFailsWhenTheResponseHasTheWrongSize) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    // Use the same type of packet so that we know if the id really is checked
+    res_connect resp;
+    resp.id = api_command_connect;
+    resp.is_response = 1;
+    resp.successful = 1;
+    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 3;
+            *size = sizeof(resp) - 1;
+            return &resp;
+        }
+    ));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
@@ -218,12 +258,14 @@ TEST_F(Api, ReceivingAResponseFromAnUnrelatedEndpointDoesNothing) {
     EXPECT_CALL(driver, recv(_, _)).Times(2)
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
+                *size = sizeof(resp);
                 *endpoint = 1;
                 return &resp;
             }
         ))
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
+                *size = sizeof(resp);
                 *endpoint = 3;
                 return &resp;
             }
@@ -241,13 +283,20 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionRespon
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_is_connected(1));
 
     EXPECT_CALL(driver, recv( _, _)).Times(2)
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
+                *size = sizeof(resp);
                 *endpoint = 1;
                 return &resp;
             }
@@ -277,19 +326,27 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseF
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_is_connected(1));
 
     EXPECT_CALL(driver, recv( _, _)).Times(2)
         .WillOnce(Invoke(
             [&general_response](uint8_t* endpoint, uint8_t* size) {
+                *size = sizeof(general_response);
                 *endpoint = 1;
                 return &general_response;
             }
         ))
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
+                *size = sizeof(resp);
                 *endpoint = 2;
                 return &resp;
             }
@@ -309,7 +366,13 @@ TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
     EXPECT_CALL(mock, get_driver(1)).WillOnce(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_connect(1));
 }
@@ -324,7 +387,13 @@ TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
     EXPECT_CALL(driver, connect(1)).Times(2).WillOnce(Return(false)).WillOnce(Return(true));
     EXPECT_FALSE(api_connect(1));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     EXPECT_TRUE(api_connect(1));
 }
 
@@ -337,7 +406,12 @@ TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
     EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).WillRepeatedly(Return(&resp));
+    EXPECT_CALL(driver, recv(_, _)).WillRepeatedly(Invoke(
+        [&resp](uint8_t* endpoint, uint8_t* size) {
+            *size = sizeof(resp);
+            return &resp;
+        }
+    ));
     for (int i = 0; i < API_MAX_CONNECTED_ENDPOINTS; i++) {
         EXPECT_TRUE(api_connect(i));
     }
