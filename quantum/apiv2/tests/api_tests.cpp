@@ -135,7 +135,7 @@ TEST_F(Api, ASuccessfulConnection) {
             sizeof(req_connect))
         )
         .Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv( _, _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_CALL(driver, recv( Pointee(3), _)).Times(1).WillOnce(Return(&resp));
     EXPECT_TRUE(api_connect(3));
     EXPECT_TRUE(api_is_connected(3));
     // Another endpoint should not be connected
@@ -152,7 +152,7 @@ TEST_F(Api, AFailedConnection) {
     EXPECT_FALSE(api_is_connected(3));
 }
 
-TEST_F(Api, AFailedConnectionThroughFailureDuringConnectionPacketSendAndReceive) {
+TEST_F(Api, AFailedConnectionThroughFailureDuringConnectionPacketSend) {
     EXPECT_FALSE(api_is_connected(3));
     GetDriverMock mock;
     DriverMock<1> driver;
@@ -203,6 +203,101 @@ TEST_F(Api, AConnectionFailsWhenTheresADisconnectWaitingForResponse) {
     EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(nullptr));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
+}
+
+TEST_F(Api, ReceivingAResponseFromAnUnrelatedEndpointDoesNothing) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    res_connect resp;
+    resp.id = api_command_connect;
+    resp.successful = 1;
+    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
+
+    EXPECT_CALL(driver, recv(_, _)).Times(2)
+        .WillOnce(Invoke(
+            [&resp](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                return &resp;
+            }
+        ))
+        .WillOnce(Invoke(
+            [&resp](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 3;
+                return &resp;
+            }
+        ));
+    EXPECT_TRUE(api_connect(3));
+    EXPECT_TRUE(api_is_connected(3));
+}
+
+TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionResponseFromItDuringConnect) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    res_connect resp;
+    resp.id = api_command_connect;
+    resp.successful = 1;
+    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_TRUE(api_connect(1));
+    EXPECT_TRUE(api_is_connected(1));
+
+    EXPECT_CALL(driver, recv( _, _)).Times(2)
+        .WillOnce(Invoke(
+            [&resp](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                return &resp;
+            }
+        ))
+        .WillOnce(Invoke(
+            [&resp](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 2;
+                return &resp;
+            }
+        ));
+    EXPECT_TRUE(api_connect(2));
+    EXPECT_TRUE(api_is_connected(2));
+    // The original endpoint should be disconnected
+    EXPECT_FALSE(api_is_connected(1));
+}
+
+TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseFromItDuringConnect) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    res_connect resp;
+    resp.id = api_command_connect;
+    resp.successful = 1;
+
+    res_connect general_response;
+    general_response.id = 0xDEAD;
+    general_response.successful = 1;
+    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(&resp));
+    EXPECT_TRUE(api_connect(1));
+    EXPECT_TRUE(api_is_connected(1));
+
+    EXPECT_CALL(driver, recv( _, _)).Times(2)
+        .WillOnce(Invoke(
+            [&general_response](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                return &general_response;
+            }
+        ))
+        .WillOnce(Invoke(
+            [&resp](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 2;
+                return &resp;
+            }
+        ));
+    EXPECT_TRUE(api_connect(2));
+    EXPECT_TRUE(api_is_connected(2));
+    // The original endpoint should be disconnected
+    EXPECT_FALSE(api_is_connected(1));
 }
 
 TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
