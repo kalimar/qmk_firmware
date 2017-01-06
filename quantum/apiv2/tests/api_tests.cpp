@@ -387,7 +387,7 @@ TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(1)).WillOnce(Return(driver.get_driver()));
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
     EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(

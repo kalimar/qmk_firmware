@@ -68,45 +68,23 @@ bool api_connect(uint8_t endpoint) {
     }
     api_driver_t* driver = api_get_driver(endpoint);
     if (driver) {
-        bool connected =  driver->connect(endpoint);
-        if (connected) {
-            req_connect connect_req;
-            connect_req.id = api_command_connect;
-            connect_req.is_response = 0;
-            connect_req.protocol_version = API_PROTOCOL_VERSION;
-            connected = driver->send(endpoint, &connect_req, sizeof(connect_req));
-            while (connected) {
-                uint8_t recv_endpoint = endpoint;
-                uint8_t recv_size;
-                api_packet_t* res = (api_packet_t*)driver->recv(&recv_endpoint, &recv_size);
-                if (recv_size >= sizeof(api_packet_t)) {
-                    if (res->is_response == false) {
-                        api_add_packet(recv_endpoint, res, recv_size);
-                        continue;
-                    }
-                }
-
-                if (recv_endpoint == endpoint) {
-                    connected = false;
-                    if (res && recv_size == sizeof(res_connect) && res->id == api_command_connect) {
-                        res_connect* connect_resp = (res_connect*)res;
-                        connected = connect_resp->successful;
-                    }
-                    break;
-                } else {
-                    connected_endpoint_t* endpoint = get_endpoint(recv_endpoint);
-                    if (endpoint) {
-                        endpoint->is_valid = false;
-                    }
+        if (driver->connect(endpoint)) {
+            e->is_valid = true;
+            req_connect req;
+            req.protocol_version = API_PROTOCOL_VERSION;
+            API_SEND(endpoint, connect, &req, resp);
+            if (resp && resp->successful) {
+                return true;
+            }
+            else {
+                e = get_endpoint(endpoint);
+                if (e) {
+                    e->is_valid = false;
                 }
             }
         }
-        e->is_valid = connected;
-        return connected;
     }
-    else {
-        return false;
-    }
+    return false;
 }
 
 bool api_is_connected(uint8_t endpoint) {
@@ -152,7 +130,7 @@ void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint
 }
 
 void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size) {
-    if (size < sizeof(api_packet_t*)) {
+    if (size < sizeof(api_packet_t)) {
         return NULL;
     }
     api_packet_t* send_packet = (api_packet_t*)(data);
