@@ -45,6 +45,17 @@ case api_command_##id: \
         api_internal_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
         break; \
     }
+#ifdef __cplusplus
+#define API_SEND(endpoint, id, msg, response) \
+    static_assert(std::is_same<decltype(msg), req_##id*>::value, \
+        "You didn't pass a pointer to the right message type to API_SEND"); \
+    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
+#else
+#define API_SEND(endpoint, id, msg, response) \
+    _Static_assert(__builtin_types_compatible_p(__typeof__(msg), req_##id*), \
+        "You didn't pass a pointer to the right message type to API_SEND"); \
+    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id))
+#endif
 
 
 #include "api_commands.h"
@@ -53,6 +64,7 @@ case api_command_##id: \
 
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
+void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size);
 void api_reset(void);
 
 

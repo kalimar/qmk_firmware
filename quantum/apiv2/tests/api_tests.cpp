@@ -33,6 +33,20 @@ using testing::AllOf;
 using testing::PrintToString;
 using testing::InSequence;
 
+enum test_commands {
+    api_command_qmk = api_qmk_begin + 100,
+    api_command_keyboard = api_keyboard_begin + 100,
+    api_command_keymap = api_keymap_begin + 100,
+};
+
+BEGIN_MSG
+    uint32_t request;
+END_MSG(req_qmk);
+
+BEGIN_MSG
+    uint32_t response;
+END_MSG(res_qmk);
+
 MATCHER(CommandIsResponse, "The command is a response") {
     return arg->is_response;
 }
@@ -579,6 +593,215 @@ TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) 
         }
     ));
     EXPECT_TRUE(api_connect(1));
+}
+
+class ConnectedApi : public Api
+{
+public:
+    ConnectedApi() {
+        connect_endpoint(1);
+    }
+
+    void connect_endpoint(uint8_t endpoint) {
+        res_connect resp;
+        resp.is_response = 1;
+        resp.id = api_command_connect;
+        resp.successful = 1;
+        EXPECT_CALL(mock, get_driver(endpoint)).WillRepeatedly(Return(driver.get_driver()));
+        EXPECT_CALL(driver, connect(endpoint)).Times(1).WillOnce(Return(true));
+        EXPECT_CALL(driver,
+            send(endpoint,
+                MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
+                    Field(&req_connect::protocol_version, API_PROTOCOL_VERSION),
+                    CommandIsRequest(),
+                    CommandIs(api_command_connect)
+                ))),
+                sizeof(req_connect))
+        ).WillOnce(Return(true));
+        EXPECT_CALL(driver, recv(Pointee(endpoint), _)).Times(1).WillOnce(Invoke(
+            [&resp, ep=endpoint](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = ep;
+                *size = sizeof(resp);
+                return &resp;
+            }
+        ));
+        EXPECT_TRUE(api_connect(endpoint));
+        EXPECT_TRUE(api_is_connected(endpoint));
+    }
+
+    GetDriverMock mock;
+    DriverMock<1> driver;
+
+};
+
+TEST_F(ConnectedApi, SuccessfulSendAndReceive) {
+    req_qmk request;
+    request.request = 37;
+
+    res_qmk response;
+    response.id = api_command_qmk;
+    response.is_response = true;
+    response.response = 12;
+
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<req_qmk*>(AllOf(
+                Field(&req_qmk::request, 37),
+                CommandIsRequest(),
+                CommandIs(api_command_qmk)
+            ))),
+            sizeof(req_qmk))
+    ).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response);
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    ASSERT_NE(received_resp, nullptr);
+    EXPECT_EQ(12, received_resp->response);
+    EXPECT_TRUE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, AFailedSendReturnsNullAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(false));
+    API_SEND(1, qmk, &request, received_resp);
+    ASSERT_EQ(received_resp, nullptr);
+    ASSERT_FALSE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, AFailedReceiveOfResponseReturnsNullAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(nullptr));
+    API_SEND(1, qmk, &request, received_resp);
+    ASSERT_EQ(received_resp, nullptr);
+    ASSERT_FALSE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, AFailedReceiveOfResponseWithAnyEndpointReturnsNullAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [](uint8_t* endpoint, uint8_t* size) {
+            // Set the endpoint to something else, to make sure that it's still handled correctly
+            // Even if the driver doesn't set it
+            *endpoint = 27;
+            return nullptr;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    ASSERT_EQ(received_resp, nullptr);
+    ASSERT_FALSE(api_is_connected(1));
+}
+
+
+TEST_F(Api, ASendFailsForADisconnectedEndpoint) {
+    GetDriverMock mock;
+    DriverMock<1> driver;
+    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(driver, connect(1)).Times(0);
+    EXPECT_CALL(driver, send(1, _, _)).Times(0);
+    req_qmk request;
+    request.request = 37;
+    API_SEND(1, qmk, &request, resp);
+    EXPECT_EQ(resp, nullptr);
+}
+
+TEST_F(ConnectedApi, TryingToSendATooSmallPacketReturnsNullButDoesntDisconnect) {
+    uint8_t request;
+
+    EXPECT_CALL(driver, send(1, _, _)).Times(0);
+    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
+    EXPECT_EQ(res, nullptr);
+    EXPECT_TRUE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongIdFailsAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    res_qmk response;
+    response.id = 0xDEAD;
+    response.is_response = true;
+    response.response = 12;
+
+    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response);
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    EXPECT_EQ(received_resp, nullptr);
+    EXPECT_FALSE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongSizeFailsAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    res_qmk response;
+    response.id = api_command_qmk;
+    response.is_response = true;
+    response.response = 12;
+
+    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response) + 3;
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    EXPECT_EQ(received_resp, nullptr);
+    EXPECT_FALSE(api_is_connected(1));
+}
+
+TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTheOriginalCanStillSuccceed) {
+    req_qmk request;
+    request.request = 37;
+
+    res_qmk response;
+    response.id = api_command_qmk;
+    response.is_response = true;
+    response.response = 12;
+
+    connect_endpoint(4);
+
+    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(2).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 4;
+            *size = sizeof(response);
+            return &response;
+        }
+    )).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response);
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    EXPECT_NE(received_resp, nullptr);
+    EXPECT_TRUE(api_is_connected(1));
+    EXPECT_FALSE(api_is_connected(4));
 }
 
 // TODO: Add tests for other requests during connect

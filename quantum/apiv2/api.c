@@ -150,3 +150,49 @@ void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint
         driver->send(endpoint, packet, size);
     }
 }
+
+void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size) {
+    if (size < sizeof(api_packet_t*)) {
+        return NULL;
+    }
+    api_packet_t* send_packet = (api_packet_t*)(data);
+    send_packet->id = command;
+    send_packet->is_response = false;
+    api_driver_t* driver = api_get_driver(endpoint);
+    bool connected = api_is_connected(endpoint);
+    if (connected) {
+        connected = driver->send(endpoint, data, size);
+    }
+    else {
+        return NULL;
+    }
+    while (connected) {
+        uint8_t recv_endpoint = endpoint;
+        uint8_t actual_recv_size;
+        api_packet_t* res = (api_packet_t*)driver->recv(&recv_endpoint, &actual_recv_size);
+        if (!res)  {
+            break;
+        }
+        if (actual_recv_size >= sizeof(api_packet_t)) {
+            if (res->is_response == false) {
+                // TODO: This need to be unit tested
+                api_add_packet(recv_endpoint, res, actual_recv_size);
+                continue;
+            }
+        }
+
+        if (recv_endpoint == endpoint) {
+            if (actual_recv_size == recv_size && res->id == command) {
+                return res;
+            }
+            break;
+        } else {
+            connected_endpoint_t* endpoint = get_endpoint(recv_endpoint);
+            if (endpoint) {
+                endpoint->is_valid = false;
+            }
+        }
+    }
+    get_endpoint(endpoint)->is_valid = false;
+    return NULL;
+}
