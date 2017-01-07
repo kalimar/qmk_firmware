@@ -39,7 +39,7 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
 #define API_HANDLE(id, function) \
 case api_command_##id: \
     if (sizeof(req_##id) == size) { \
-        req_##id* request = (req_##id*)(buffer); \
+        req_##id* request = (req_##id*)(packet); \
         res_##id response; \
         function(endpoint, request, &response); \
         api_internal_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
@@ -101,7 +101,7 @@ typedef struct {
 api_driver_t* api_get_driver(uint8_t endpoint);
 
 // * The keyboard should call this when an incoming packet is received
-// * Typically this would be implemented by iterating all the drivers onece every scan loop and call recv with
+// * Typically this would be implemented by iterating all the drivers once every scan loop and call recv with
 //   a NULL endpoint. If data is received, then you call api_add_packet.
 // * The lifetime for the buffer pointer is the same as the driver, which means that it doesn't necessarily
 //   even have to be valid until the function returns
@@ -109,6 +109,10 @@ api_driver_t* api_get_driver(uint8_t endpoint);
 //   another thread as soon as a packet is received.
 // * Also don't call this function as a response to another driver request, like recv
 void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size);
+
+bool api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
+bool api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
+bool api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 
 
 void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size);

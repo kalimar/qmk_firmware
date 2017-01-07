@@ -115,6 +115,47 @@ private:
 template<size_t id>
 DriverMock<id>* DriverMock<id>::s_instance = nullptr;
 
+class ProcessApiMock {
+public:
+    ProcessApiMock() {
+        s_instance = this;
+    }
+
+    ~ProcessApiMock() {
+        s_instance = nullptr;
+    }
+    MOCK_METHOD3(api_process_qmk, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    MOCK_METHOD3(api_process_keyboard, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    MOCK_METHOD3(api_process_keymap, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    static ProcessApiMock* s_instance;
+};
+
+ProcessApiMock* ProcessApiMock::s_instance = nullptr;
+
+bool api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+    if (ProcessApiMock::s_instance) {
+        return ProcessApiMock::s_instance->api_process_qmk(endpoint, packet, size);
+    } else {
+        return false;
+    }
+}
+
+bool api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+    if (ProcessApiMock::s_instance) {
+        return ProcessApiMock::s_instance->api_process_keyboard(endpoint, packet, size);
+    } else {
+        return false;
+    }
+}
+
+bool api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+    if (ProcessApiMock::s_instance) {
+        return ProcessApiMock::s_instance->api_process_keymap(endpoint, packet, size);
+    } else {
+        return false;
+    }
+}
+
 class Api : public testing::Test
 {
 public:
@@ -885,6 +926,35 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
     ));
     API_SEND(1, qmk, &request, received_resp);
     EXPECT_NE(received_resp, nullptr);
+}
+
+TEST_F(Api, ProcessAcceptedIncomingQMKPacketReturnsTheCorrectResponse) {
+    ProcessApiMock process;
+    req_qmk request;
+    request.id = api_command_qmk;
+    request.is_response = false;
+    request.request = 12;
+
+    DriverMock<1> driver;
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+
+    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+
+    };
+
+    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request))).WillOnce(
+        Invoke(
+            [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+                switch (packet->id) {
+                    API_HANDLE(qmk, handle_qmk);
+                }
+            }
+        ));
+    // TODO Test that the correct response is sent
+    EXPECT_CALL(driver, send(4, _, _)).WillOnce(Return(true));
+
+    api_add_packet(4, &request, sizeof(request));
 }
 
 // TODO: Add tests for other requests during connect

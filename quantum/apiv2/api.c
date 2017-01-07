@@ -117,6 +117,12 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     switch(packet->id) {
         API_HANDLE(connect, process_incoming_connect);
     }
+    // Need another switch to avoid duplicate entries
+    switch (packet->id) {
+        case api_qmk_begin ... api_qmk_end:
+            api_process_qmk(endpoint, packet, size);
+            break;
+    }
 }
 
 void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size) {
@@ -165,8 +171,8 @@ void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint
                 connected = false;
             }
         } else {
-            // We got something bad from another endpoint, most likely the wrong response, so disconnect if
-            // we have an open connection
+            // We got something unexpected from another endpoint, most likely the wrong response, so
+            // disconnect if we have an open connection
             connected_endpoint_t* e = get_endpoint(recv_endpoint);
             if (e) {
                 e->is_valid = false;
