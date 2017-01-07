@@ -735,7 +735,6 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongIdFailsAndDisconnects) {
     response.is_response = true;
     response.response = 12;
 
-    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
@@ -758,7 +757,6 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongSizeFailsAndDisconnects) {
     response.is_response = true;
     response.response = 12;
 
-    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
@@ -783,7 +781,6 @@ TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTh
 
     connect_endpoint(4);
 
-    auto* res = api_send(1, api_command_qmk, &request, 1, sizeof(res_qmk));
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, recv(Pointee(1), _)).Times(2).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
@@ -802,6 +799,92 @@ TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTh
     EXPECT_NE(received_resp, nullptr);
     EXPECT_TRUE(api_is_connected(1));
     EXPECT_FALSE(api_is_connected(4));
+}
+
+TEST_F(ConnectedApi, AnIncomingConnectionRequestFromTheSameEndpointIsAcceptedDuringSend) {
+    req_qmk request;
+    request.request = 37;
+
+    req_connect con_req;
+    con_req.is_response = false;
+    con_req.id = api_command_connect;
+    con_req.protocol_version = API_PROTOCOL_VERSION;
+
+    res_qmk response;
+    response.id = api_command_qmk;
+    response.is_response = true;
+    response.response = 12;
+
+    InSequence s;
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+        [&con_req](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(con_req);
+            return &con_req;
+        }
+    ));
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect))
+    ).Times(1);
+    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response);
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    EXPECT_NE(received_resp, nullptr);
+}
+
+TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAcceptedDuringSend) {
+    req_qmk request;
+    request.request = 37;
+
+    req_connect con_req;
+    con_req.is_response = false;
+    con_req.id = api_command_connect;
+    con_req.protocol_version = API_PROTOCOL_VERSION;
+
+    res_qmk response;
+    response.id = api_command_qmk;
+    response.is_response = true;
+    response.response = 12;
+
+    EXPECT_CALL(mock, get_driver(7)).WillRepeatedly(Return(driver.get_driver()));
+
+    InSequence s;
+    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+        [&con_req](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 7;
+            *size = sizeof(con_req);
+            return &con_req;
+        }
+    ));
+    EXPECT_CALL(driver,
+        send(7,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect))
+    ).Times(1);
+    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+        [&response](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(response);
+            return &response;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    EXPECT_NE(received_resp, nullptr);
 }
 
 // TODO: Add tests for other requests during connect
