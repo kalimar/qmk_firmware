@@ -149,28 +149,31 @@ void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint
         uint8_t actual_recv_size;
         api_packet_t* res = (api_packet_t*)driver->recv(&recv_endpoint, &actual_recv_size);
         if (!res)  {
-            break;
+            connected = false;
         }
-        if (actual_recv_size >= sizeof(api_packet_t)) {
-            if (res->is_response == false) {
-                // TODO: This need to be unit tested
-                api_add_packet(recv_endpoint, res, actual_recv_size);
-                continue;
-            }
+        else if (actual_recv_size >= sizeof(api_packet_t) && res->is_response == false) {
+            // TODO: This need to be unit tested
+            // Now partly unit tested for connection packets
+            api_add_packet(recv_endpoint, res, actual_recv_size);
+            continue;
         }
-
-        if (recv_endpoint == endpoint) {
+        else if (recv_endpoint == endpoint) {
             if (actual_recv_size == recv_size && res->id == command) {
                 return res;
             }
-            break;
+            else {
+                connected = false;
+            }
         } else {
-            connected_endpoint_t* endpoint = get_endpoint(recv_endpoint);
-            if (endpoint) {
-                endpoint->is_valid = false;
+            // We got something bad from another endpoint, most likely the wrong response, so disconnect if
+            // we have an open connection
+            connected_endpoint_t* e = get_endpoint(recv_endpoint);
+            if (e) {
+                e->is_valid = false;
             }
         }
     }
+    // Complete the disconnection
     get_endpoint(endpoint)->is_valid = false;
     return NULL;
 }
