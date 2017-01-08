@@ -842,6 +842,36 @@ TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTh
     EXPECT_FALSE(api_is_connected(4));
 }
 
+TEST_F(ConnectedApi, AnUhandledRequestsReturnsNullToTheSenderAndDisconnects) {
+    req_qmk request;
+    request.request = 37;
+
+    res_unhandled unhandled;
+    unhandled.id = api_command_unhandled;
+    unhandled.is_response = true;
+    unhandled.original_request = api_command_qmk;
+
+    EXPECT_CALL(driver,
+        send(1,
+            MatcherCast<void*>(MatcherCast<req_qmk*>(AllOf(
+                Field(&req_qmk::request, 37),
+                CommandIsRequest(),
+                CommandIs(api_command_qmk)
+            ))),
+            sizeof(req_qmk))
+    ).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+        [&unhandled](uint8_t* endpoint, uint8_t* size) {
+            *endpoint = 1;
+            *size = sizeof(unhandled);
+            return &unhandled;
+        }
+    ));
+    API_SEND(1, qmk, &request, received_resp);
+    ASSERT_EQ(received_resp, nullptr);
+    EXPECT_FALSE(api_is_connected(1));
+}
+
 TEST_F(ConnectedApi, AnIncomingConnectionRequestFromTheSameEndpointIsAcceptedDuringSend) {
     req_qmk request;
     request.request = 37;

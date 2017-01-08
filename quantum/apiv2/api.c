@@ -182,6 +182,9 @@ void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint
             if (actual_recv_size == recv_size && res->id == command) {
                 return res;
             }
+            else if (actual_recv_size == sizeof(res_unhandled) && res->id == api_command_unhandled) {
+                connected = false;
+            }
             else {
                 connected = false;
             }
