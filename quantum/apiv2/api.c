@@ -146,11 +146,11 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (!s_response_sent) {
         res_unhandled unhandled;
         unhandled.original_request = packet->id;
-        api_internal_send_response(endpoint, api_command_unhandled, &unhandled, sizeof(unhandled));
+        api_send_response(endpoint, api_command_unhandled, &unhandled, sizeof(unhandled));
     }
 }
 
-void api_internal_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size) {
+void api_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size) {
     if (s_response_sent) {
         return;
     }

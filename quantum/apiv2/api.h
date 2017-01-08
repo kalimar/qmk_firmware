@@ -33,30 +33,31 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
 #define BEGIN_MSG typedef struct __attribute__((packed, aligned(API_ALIGN))) { \
     uint16_t id : 15; \
     uint16_t is_response : 1;
-
 #define END_MSG(name) } name;
 
 #define API_HANDLE(id, function) \
-case api_command_##id: \
-    if (sizeof(req_##id) == size) { \
-        req_##id* request = (req_##id*)(packet); \
-        res_##id response; \
-        function(endpoint, request, &response); \
-        api_internal_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
-    } \
-    break;
+    case api_command_##id: \
+        if (sizeof(req_##id) == size) { \
+            req_##id* request = (req_##id*)(packet); \
+            res_##id response; \
+            function(endpoint, request, &response); \
+            api_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
+        } \
+        break;
+
 #ifdef __cplusplus
-#define API_SEND(endpoint, id, msg, response) \
+#define CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
     static_assert(std::is_same<decltype(msg), req_##id*>::value, \
-        "You didn't pass a pointer to the right message type to API_SEND"); \
-    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
+        "You didn't pass a pointer to the right message type to API_SEND");
 #else
-#define API_SEND(endpoint, id, msg, response) \
+#define CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
     _Static_assert(__builtin_types_compatible_p(__typeof__(msg), req_##id*), \
-        "You didn't pass a pointer to the right message type to API_SEND"); \
-    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id))
+        "You didn't pass a pointer to the right message type to API_SEND");
 #endif
 
+#define API_SEND(endpoint, id, msg, response) \
+    CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
+    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
 
 #include "api_commands.h"
 #include "api_requests.h"
@@ -65,6 +66,7 @@ case api_command_##id: \
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
 void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size);
+void api_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size);
 void api_reset(void);
 
 
@@ -115,7 +117,6 @@ void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 
 
-void api_internal_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size);
 
 
 #endif /* QUANTUM_APIV2_API_H_ */

@@ -1115,7 +1115,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
 
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
         res->response = 42;
-        api_internal_send_response(endpoint, api_command_qmk, res, sizeof(res_qmk));
+        api_send_response(endpoint, api_command_qmk, res, sizeof(res_qmk));
     };
 
     EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
