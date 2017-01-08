@@ -21,82 +21,78 @@
 #error Please define API_MAX_CONNECTED_ENDPOINTS
 #endif
 
-typedef struct {
-    uint8_t endpoint;
-    bool is_valid;
-}connected_endpoint_t;
+#define NOT_CONNECTED 255
 
-static connected_endpoint_t connected_endpoints[API_MAX_CONNECTED_ENDPOINTS] = {
-    [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = {.is_valid = false }
+static uint8_t outgoing_connections[API_MAX_CONNECTED_ENDPOINTS] = {
+    [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = NOT_CONNECTED
 };
 
 static bool s_response_sent = false;
 
-connected_endpoint_t* get_endpoint(uint8_t endpoint) {
+static uint8_t* get_connection(uint8_t endpoint, uint8_t* connections) {
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
-        connected_endpoint_t* e = &connected_endpoints[i];
-        if (e->is_valid && e->endpoint == endpoint) {
-            return e;
+        uint8_t* c = &connections[i];
+        if (*c == endpoint) {
+            return c;
         }
     }
     return NULL;
 }
 
-connected_endpoint_t* get_or_create_endpoint(uint8_t endpoint) {
-    connected_endpoint_t* free_endpoint = NULL;
+static uint8_t* get_or_reserve_connection(uint8_t endpoint, uint8_t* connections) {
+    uint8_t* free_connection = NULL;
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
-        connected_endpoint_t* e = &connected_endpoints[i];
-        if (!e->is_valid && free_endpoint == NULL) {
-            free_endpoint = e;
+        uint8_t* e = &connections[i];
+        if (*e == NOT_CONNECTED && free_connection == NULL) {
+            free_connection = e;
         }
-        else if(e->is_valid && e->endpoint == endpoint) {
+        else if(*e == endpoint) {
             return e;
         }
     }
-    if (free_endpoint) {
-        free_endpoint->endpoint = endpoint;
-    }
-    return free_endpoint;
+    return free_connection;
 }
 
+static void disconnect_endpoint(uint8_t endpoint, uint8_t* connections) {
+    uint8_t* c = get_connection(endpoint, connections);
+    if (c) {
+        *c = NOT_CONNECTED;
+    }
+}
 
 bool api_connect(uint8_t endpoint) {
-    connected_endpoint_t* e = get_or_create_endpoint(endpoint);
-    if (!e) {
+    uint8_t* c = get_or_reserve_connection(endpoint, outgoing_connections);
+    if (!c) {
         return false;
     }
-    if (e->is_valid) {
+    if (*c != NOT_CONNECTED) {
         return true;
     }
+    *c = endpoint;
     api_driver_t* driver = api_get_driver(endpoint);
     if (driver) {
         if (driver->connect(endpoint)) {
-            e->is_valid = true;
             req_connect req;
             req.protocol_version = API_PROTOCOL_VERSION;
             API_SEND(endpoint, connect, &req, resp);
             if (resp && resp->successful) {
                 return true;
             }
-            else {
-                e = get_endpoint(endpoint);
-                if (e) {
-                    e->is_valid = false;
-                }
-            }
         }
+    }
+    if (*c == endpoint) {
+        *c = NOT_CONNECTED;
     }
     return false;
 }
 
 bool api_is_connected(uint8_t endpoint) {
-    return get_endpoint(endpoint) != NULL;
+    return get_connection(endpoint, outgoing_connections) != NULL;
 }
 
 void api_reset(void) {
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
-        connected_endpoint_t* e = &connected_endpoints[i];
-        e->is_valid = false;
+        outgoing_connections[i] = NOT_CONNECTED;
     }
     s_response_sent = false;
 }
@@ -205,13 +201,10 @@ void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uin
         } else {
             // We got something unexpected from another endpoint, most likely the wrong response, so
             // disconnect if we have an open connection
-            connected_endpoint_t* e = get_endpoint(recv_endpoint);
-            if (e) {
-                e->is_valid = false;
-            }
+            disconnect_endpoint(recv_endpoint, outgoing_connections);
         }
     }
     // Complete the disconnection
-    get_endpoint(endpoint)->is_valid = false;
+    disconnect_endpoint(endpoint, outgoing_connections);
     return NULL;
 }
