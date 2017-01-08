@@ -915,7 +915,8 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
                 CommandIsResponse(),
                 CommandIs(api_command_connect)
             ))),
-            sizeof(res_connect))
+            sizeof(res_connect)
+        )
     ).Times(1);
     EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
@@ -928,7 +929,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
     EXPECT_NE(received_resp, nullptr);
 }
 
-TEST_F(Api, ProcessAcceptedIncomingQMKPacketReturnsTheCorrectResponse) {
+TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     ProcessApiMock process;
     req_qmk request;
     request.id = api_command_qmk;
@@ -940,20 +941,27 @@ TEST_F(Api, ProcessAcceptedIncomingQMKPacketReturnsTheCorrectResponse) {
     EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
 
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
-
+        res->response = 42;
     };
 
-    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request))).WillOnce(
-        Invoke(
-            [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
-                switch (packet->id) {
-                    API_HANDLE(qmk, handle_qmk);
-                }
+    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    .WillOnce(Invoke(
+        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+            switch (packet->id) {
+                API_HANDLE(qmk, handle_qmk);
             }
-        ));
-    // TODO Test that the correct response is sent
-    EXPECT_CALL(driver, send(4, _, _)).WillOnce(Return(true));
-
+        })
+    );
+    EXPECT_CALL(driver,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_qmk),
+                Field(&res_qmk::response, 42)
+            ))),
+            sizeof(res_qmk)
+         )
+    ).WillOnce(Return(true));
     api_add_packet(4, &request, sizeof(request));
 }
 
