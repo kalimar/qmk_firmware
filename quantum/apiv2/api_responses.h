@@ -23,5 +23,9 @@ BEGIN_MSG
     uint8_t successful;
 END_MSG(res_connect);
 
+BEGIN_MSG
+    uint8_t original_request; // The command id for the request that was unhandled
+END_MSG(res_unhandled);
+
 
 #endif /* QUANTUM_APIV2_API_RESPONSES_H_ */

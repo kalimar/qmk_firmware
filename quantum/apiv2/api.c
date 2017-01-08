@@ -30,6 +30,8 @@ static connected_endpoint_t connected_endpoints[API_MAX_CONNECTED_ENDPOINTS] = {
     [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = {.is_valid = false }
 };
 
+static bool s_response_sent = false;
+
 connected_endpoint_t* get_endpoint(uint8_t endpoint) {
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
         connected_endpoint_t* e = &connected_endpoints[i];
@@ -96,6 +98,7 @@ void api_reset(void) {
         connected_endpoint_t* e = &connected_endpoints[i];
         e->is_valid = false;
     }
+    s_response_sent = false;
 }
 
 static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_connect* resp) {
@@ -114,6 +117,8 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (packet->is_response) {
         return;
     }
+    s_response_sent = false;
+
     switch(packet->id) {
         API_HANDLE(connect, process_incoming_connect);
     }
@@ -123,9 +128,18 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
             api_process_qmk(endpoint, packet, size);
             break;
     }
+
+    if (!s_response_sent) {
+        res_unhandled unhandled;
+        unhandled.original_request = packet->id;
+        api_internal_send_response(endpoint, api_command_unhandled, &unhandled, sizeof(unhandled));
+    }
 }
 
 void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size) {
+    if (s_response_sent) {
+        return;
+    }
     api_driver_t* driver = api_get_driver(endpoint);
     if (driver) {
         api_packet_t* packet = (api_packet_t*)(buffer);
@@ -133,6 +147,7 @@ void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint
         packet->is_response = true;
         driver->send(endpoint, packet, size);
     }
+    s_response_sent = true;
 }
 
 void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size) {

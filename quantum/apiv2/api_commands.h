@@ -21,6 +21,7 @@ enum api_commands {
     api_qmk_begin=0,
     // Don't add anything before this line
     api_command_connect,
+    api_command_unhandled, // Only valid as a response, returned when the remote doesn't handle the request
     // Don't add anything after this here, define another enum in your keyboard or keymap instead
     api_qmk_end = 8191,
     api_keyboard_begin = 8192,

@@ -965,4 +965,71 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     api_add_packet(4, &request, sizeof(request));
 }
 
+TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
+    ProcessApiMock process;
+    req_qmk request;
+    request.id = api_command_qmk;
+    request.is_response = false;
+    request.request = 12;
+
+    DriverMock<1> driver;
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+
+    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    .WillOnce(Invoke(
+        [](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+            return true; // Like we would if we handle the request
+        })
+    );
+    EXPECT_CALL(driver,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_unhandled*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_unhandled),
+                Field(&res_unhandled::original_request, api_command_qmk)
+            ))),
+            sizeof(res_unhandled)
+         )
+    ).WillOnce(Return(true));
+    api_add_packet(4, &request, sizeof(request));
+}
+
+TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
+    ProcessApiMock process;
+    req_qmk request;
+    request.id = api_command_qmk;
+    request.is_response = false;
+    request.request = 12;
+
+    DriverMock<1> driver;
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+
+    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+        res->response = 42;
+        api_internal_send_response(endpoint, api_command_qmk, res, sizeof(res_qmk));
+    };
+
+    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    .WillOnce(Invoke(
+        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+            switch (packet->id) {
+                API_HANDLE(qmk, handle_qmk);
+            }
+        })
+    );
+    EXPECT_CALL(driver,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_qmk),
+                Field(&res_qmk::response, 42)
+            ))),
+            sizeof(res_qmk)
+         )
+    ).Times(1).WillOnce(Return(true));
+    api_add_packet(4, &request, sizeof(request));
+}
+
 // TODO: Add tests for other requests during connect
