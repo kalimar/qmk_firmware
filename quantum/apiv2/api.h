@@ -43,8 +43,8 @@ case api_command_##id: \
         res_##id response; \
         function(endpoint, request, &response); \
         api_internal_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
-        break; \
-    }
+    } \
+    break;
 #ifdef __cplusplus
 #define API_SEND(endpoint, id, msg, response) \
     static_assert(std::is_same<decltype(msg), req_##id*>::value, \
@@ -64,7 +64,7 @@ case api_command_##id: \
 
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
-void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size);
+void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size);
 void api_reset(void);
 
 
@@ -110,12 +110,12 @@ api_driver_t* api_get_driver(uint8_t endpoint);
 // * Also don't call this function as a response to another driver request, like recv
 void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size);
 
-bool api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
-bool api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
-bool api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
+void api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
+void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
+void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 
 
-void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size);
+void api_internal_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size);
 
 
 #endif /* QUANTUM_APIV2_API_H_ */

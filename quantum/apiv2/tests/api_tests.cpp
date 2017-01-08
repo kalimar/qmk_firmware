@@ -47,6 +47,18 @@ BEGIN_MSG
     uint32_t response;
 END_MSG(res_qmk);
 
+BEGIN_MSG
+END_MSG(req_keyboard)
+
+BEGIN_MSG
+END_MSG(res_keyboard)
+
+BEGIN_MSG
+END_MSG(req_keymap)
+
+BEGIN_MSG
+END_MSG(res_keymap)
+
 MATCHER(CommandIsResponse, "The command is a response") {
     return arg->is_response;
 }
@@ -124,35 +136,29 @@ public:
     ~ProcessApiMock() {
         s_instance = nullptr;
     }
-    MOCK_METHOD3(api_process_qmk, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
-    MOCK_METHOD3(api_process_keyboard, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
-    MOCK_METHOD3(api_process_keymap, bool (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    MOCK_METHOD3(api_process_qmk, void (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    MOCK_METHOD3(api_process_keyboard, void (uint8_t endpoint, api_packet_t* packet, uint8_t size));
+    MOCK_METHOD3(api_process_keymap, void (uint8_t endpoint, api_packet_t* packet, uint8_t size));
     static ProcessApiMock* s_instance;
 };
 
 ProcessApiMock* ProcessApiMock::s_instance = nullptr;
 
-bool api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+void api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
     if (ProcessApiMock::s_instance) {
-        return ProcessApiMock::s_instance->api_process_qmk(endpoint, packet, size);
-    } else {
-        return false;
+        ProcessApiMock::s_instance->api_process_qmk(endpoint, packet, size);
     }
 }
 
-bool api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
     if (ProcessApiMock::s_instance) {
-        return ProcessApiMock::s_instance->api_process_keyboard(endpoint, packet, size);
-    } else {
-        return false;
+        ProcessApiMock::s_instance->api_process_keyboard(endpoint, packet, size);
     }
 }
 
-bool api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
     if (ProcessApiMock::s_instance) {
-        return ProcessApiMock::s_instance->api_process_keymap(endpoint, packet, size);
-    } else {
-        return false;
+        ProcessApiMock::s_instance->api_process_keymap(endpoint, packet, size);
     }
 }
 
@@ -976,12 +982,14 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
 
     EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
     .WillOnce(Invoke(
-        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
             switch (packet->id) {
                 API_HANDLE(qmk, handle_qmk);
             }
         })
     );
+    EXPECT_CALL(process, api_process_keyboard(_, _, _)).Times(0);
+    EXPECT_CALL(process, api_process_keymap(_, _, _)).Times(0);
     EXPECT_CALL(driver,
         send(4,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
@@ -990,6 +998,76 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
                 Field(&res_qmk::response, 42)
             ))),
             sizeof(res_qmk)
+         )
+    ).WillOnce(Return(true));
+    api_add_packet(4, &request, sizeof(request));
+}
+
+TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
+    ProcessApiMock process;
+    req_keyboard request;
+    request.id = api_command_keyboard;
+    request.is_response = false;
+
+    DriverMock<1> driver;
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+
+    auto handle_keyboard = [](uint8_t endpoint, req_keyboard* req, res_keyboard* res) {
+    };
+
+    EXPECT_CALL(process, api_process_keyboard(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    .WillOnce(Invoke(
+        [handle_keyboard](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+            switch (packet->id) {
+                API_HANDLE(keyboard, handle_keyboard);
+            }
+        })
+    );
+    EXPECT_CALL(process, api_process_qmk(_, _, _)).Times(0);
+    EXPECT_CALL(process, api_process_keymap(_, _, _)).Times(0);
+    EXPECT_CALL(driver,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_keyboard*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_keyboard)
+            ))),
+            sizeof(res_keyboard)
+         )
+    ).WillOnce(Return(true));
+    api_add_packet(4, &request, sizeof(request));
+}
+
+TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
+    ProcessApiMock process;
+    req_keyboard request;
+    request.id = api_command_keymap;
+    request.is_response = false;
+
+    DriverMock<1> driver;
+    GetDriverMock mock;
+    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+
+    auto handle_keymap = [](uint8_t endpoint, req_keymap* req, res_keymap* res) {
+    };
+
+    EXPECT_CALL(process, api_process_keymap(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    .WillOnce(Invoke(
+        [handle_keymap](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+            switch (packet->id) {
+                API_HANDLE(keymap, handle_keymap);
+            }
+        })
+    );
+    EXPECT_CALL(process, api_process_qmk(_, _, _)).Times(0);
+    EXPECT_CALL(process, api_process_keyboard(_, _, _)).Times(0);
+    EXPECT_CALL(driver,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_keymap*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_keymap)
+            ))),
+            sizeof(res_keymap)
          )
     ).WillOnce(Return(true));
     api_add_packet(4, &request, sizeof(request));
@@ -1008,8 +1086,7 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
 
     EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
     .WillOnce(Invoke(
-        [](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
-            return true; // Like we would if we handle the request
+        [](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
         })
     );
     EXPECT_CALL(driver,
@@ -1043,7 +1120,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
 
     EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
     .WillOnce(Invoke(
-        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) -> bool {
+        [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
             switch (packet->id) {
                 API_HANDLE(qmk, handle_qmk);
             }

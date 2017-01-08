@@ -105,28 +105,42 @@ static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_con
     resp->successful = req->protocol_version == API_PROTOCOL_VERSION;
 }
 
+static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+    switch(packet->id) {
+        API_HANDLE(connect, process_incoming_connect);
+    }
+}
+
 void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (size < sizeof(api_packet_t) ) {
+        // TODO: Test this
         return;
     }
     if (((uintptr_t)(buffer) % API_ALIGN) != 0) {
+        // TODO: Add similar tests to the sending function
         return;
     }
     api_packet_t* packet = (api_packet_t*)(buffer);
     // We should not receive responses if we are not waiting for it
     if (packet->is_response) {
+        // TODO: Test this
         return;
     }
     s_response_sent = false;
 
-    switch(packet->id) {
-        API_HANDLE(connect, process_incoming_connect);
-    }
-    // Need another switch to avoid duplicate entries
     switch (packet->id) {
-        case api_qmk_begin ... api_qmk_end:
-            api_process_qmk(endpoint, packet, size);
-            break;
+    case api_internal_begin ... api_internal_end:
+        process_internal(endpoint, packet, size);
+        break;
+    case api_qmk_begin ... api_qmk_end:
+        api_process_qmk(endpoint, packet, size);
+        break;
+    case api_keyboard_begin ... api_keyboard_end:
+        api_process_keyboard(endpoint, packet, size);
+        break;
+    case api_keymap_begin ... api_keymap_end:
+        api_process_keymap(endpoint, packet, size);
+        break;
     }
 
     if (!s_response_sent) {
@@ -136,7 +150,7 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     }
 }
 
-void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint8_t size) {
+void api_internal_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size) {
     if (s_response_sent) {
         return;
     }
@@ -150,7 +164,7 @@ void api_internal_send_response(uint8_t endpoint, uint8_t id, void* buffer, uint
     s_response_sent = true;
 }
 
-void* api_send(uint8_t endpoint, uint8_t command, void* data, uint8_t size, uint8_t recv_size) {
+void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size) {
     if (size < sizeof(api_packet_t)) {
         return NULL;
     }
