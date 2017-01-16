@@ -17,9 +17,7 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-extern "C" {
 #include "api.h"
-}
 
 using testing::_;
 using testing::Return;
@@ -706,7 +704,7 @@ TEST_F(ConnectedApi, SuccessfulSendAndReceive) {
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    res_qmk* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_NE(received_resp, nullptr);
     EXPECT_EQ(12, received_resp->response);
     EXPECT_TRUE(api_is_connected(1));
@@ -717,7 +715,7 @@ TEST_F(ConnectedApi, AFailedSendReturnsNullAndDisconnects) {
     request.request = 37;
 
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(false));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     ASSERT_FALSE(api_is_connected(1));
 }
@@ -728,7 +726,7 @@ TEST_F(ConnectedApi, AFailedReceiveOfResponseReturnsNullAndDisconnects) {
 
     EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
     EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(nullptr));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     ASSERT_FALSE(api_is_connected(1));
 }
@@ -746,7 +744,7 @@ TEST_F(ConnectedApi, AFailedReceiveOfResponseWithAnyEndpointReturnsNullAndDiscon
             return nullptr;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     ASSERT_FALSE(api_is_connected(1));
 }
@@ -760,7 +758,7 @@ TEST_F(Api, ASendFailsForADisconnectedEndpoint) {
     EXPECT_CALL(driver, send(1, _, _)).Times(0);
     req_qmk request;
     request.request = 37;
-    API_SEND_AND_RECV(1, qmk, &request, resp);
+    auto* resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_EQ(resp, nullptr);
 }
 
@@ -790,7 +788,7 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongIdFailsAndDisconnects) {
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_EQ(received_resp, nullptr);
     EXPECT_FALSE(api_is_connected(1));
 }
@@ -812,7 +810,7 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongSizeFailsAndDisconnects) {
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_EQ(received_resp, nullptr);
     EXPECT_FALSE(api_is_connected(1));
 }
@@ -842,7 +840,7 @@ TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTh
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_NE(received_resp, nullptr);
     EXPECT_TRUE(api_is_connected(1));
     EXPECT_FALSE(api_is_connected(4));
@@ -873,7 +871,7 @@ TEST_F(ConnectedApi, AnUhandledRequestsReturnsNullToTheSenderAndDisconnects) {
             return &unhandled;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     EXPECT_FALSE(api_is_connected(1));
 }
@@ -916,7 +914,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromTheSameEndpointIsAcceptedDur
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_NE(received_resp, nullptr);
 }
 
@@ -961,7 +959,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
             return &response;
         }
     ));
-    API_SEND_AND_RECV(1, qmk, &request, received_resp);
+    auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     EXPECT_NE(received_resp, nullptr);
 }
 

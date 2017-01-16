@@ -74,7 +74,7 @@ bool api_connect(uint8_t endpoint) {
         if (driver->connect(endpoint)) {
             req_connect req;
             req.protocol_version = API_PROTOCOL_VERSION;
-            API_SEND_AND_RECV(endpoint, connect, &req, resp);
+            res_connect* resp = API_SEND_AND_RECV(endpoint, connect, &req);
             if (resp && resp->successful) {
                 return true;
             }

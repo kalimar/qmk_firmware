@@ -17,6 +17,10 @@
 #ifndef QUANTUM_APIV2_API_H_
 #define QUANTUM_APIV2_API_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -46,18 +50,25 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
         break;
 
 #ifdef __cplusplus
-#define CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
-    static_assert(std::is_same<decltype(msg), req_##id*>::value, \
-        "You didn't pass a pointer to the right message type to API_SEND");
+} // extern "C"
+    template<typename Request, typename Response>
+    inline Response* api_send_and_recv_helper(uint8_t endpoint, uint16_t command, Request* msg)
+    {
+        return reinterpret_cast<Response*>(api_send_and_recv(endpoint, command, msg, sizeof(Request),
+            sizeof(Response)));
+    }
+#define API_SEND_AND_RECV(endpoint, id, msg) \
+    api_send_and_recv_helper<req_##id, res_##id>(endpoint, api_command_##id, msg)
+
+extern "C" {
+
 #else
-#define CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
-    _Static_assert(__builtin_types_compatible_p(__typeof__(msg), req_##id*), \
-        "You didn't pass a pointer to the right message type to API_SEND");
+#define API_SEND_AND_RECV(endpoint, id, msg) \
+    ({_Static_assert(__builtin_types_compatible_p(__typeof__(msg), req_##id*), \
+        "You didn't pass a pointer of the right message type to API_SEND_AND_RECV"); \
+    (res_##id*)api_send_and_recv(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));})
 #endif
 
-#define API_SEND_AND_RECV(endpoint, id, msg, response) \
-    CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
-    res_##id* response = (res_##id*)api_send_and_recv(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
 
 #include "api_commands.h"
 #include "api_requests.h"
@@ -118,6 +129,8 @@ void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 
 
-
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif /* QUANTUM_APIV2_API_H_ */
