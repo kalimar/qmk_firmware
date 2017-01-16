@@ -74,7 +74,7 @@ bool api_connect(uint8_t endpoint) {
         if (driver->connect(endpoint)) {
             req_connect req;
             req.protocol_version = API_PROTOCOL_VERSION;
-            API_SEND(endpoint, connect, &req, resp);
+            API_SEND_AND_RECV(endpoint, connect, &req, resp);
             if (resp && resp->successful) {
                 return true;
             }
@@ -146,23 +146,25 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     }
 }
 
-void api_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size) {
+void api_send_response(uint8_t endpoint, uint16_t command, void* buffer, uint8_t size) {
     if (s_response_sent) {
         return;
     }
     api_driver_t* driver = api_get_driver(endpoint);
     if (driver) {
         api_packet_t* packet = (api_packet_t*)(buffer);
-        packet->id = id;
+        packet->id = command;
         packet->is_response = true;
         driver->send(endpoint, packet, size);
     }
     s_response_sent = true;
 }
 
-void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size) {
+void api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size) {
     if (size < sizeof(api_packet_t)) {
-        return NULL;
+        //TODO: This is not properly tested
+        disconnect_endpoint(endpoint, outgoing_connections);
+        return;
     }
     api_packet_t* send_packet = (api_packet_t*)(data);
     send_packet->id = command;
@@ -171,10 +173,16 @@ void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uin
     bool connected = api_is_connected(endpoint);
     if (connected) {
         connected = driver->send(endpoint, data, size);
+        // TODO: Probably need to be tested separately
+        if (!connected) {
+            disconnect_endpoint(endpoint, outgoing_connections);
+        }
     }
-    else {
-        return NULL;
-    }
+}
+
+void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size) {
+    bool connected = api_is_connected(endpoint);
+    api_driver_t* driver = api_get_driver(endpoint);
     while (connected) {
         uint8_t recv_endpoint = endpoint;
         uint8_t actual_recv_size;
@@ -189,7 +197,7 @@ void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uin
             continue;
         }
         else if (recv_endpoint == endpoint) {
-            if (actual_recv_size == recv_size && res->id == command) {
+            if (actual_recv_size == size && res->id == command) {
                 return res;
             }
             else if (actual_recv_size == sizeof(res_unhandled) && res->id == api_command_unhandled) {
@@ -207,4 +215,9 @@ void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uin
     // Complete the disconnection
     disconnect_endpoint(endpoint, outgoing_connections);
     return NULL;
+}
+
+void* api_send_and_recv(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size) {
+    api_send(endpoint, command, data, size);
+    return api_recv_response(endpoint, command, recv_size);
 }

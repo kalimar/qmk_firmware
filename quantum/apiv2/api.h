@@ -55,9 +55,9 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
         "You didn't pass a pointer to the right message type to API_SEND");
 #endif
 
-#define API_SEND(endpoint, id, msg, response) \
+#define API_SEND_AND_RECV(endpoint, id, msg, response) \
     CHECK_API_SEND_PARAMS(endpoint, id, msg, response) \
-    res_##id* response = (res_##id*)api_send(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
+    res_##id* response = (res_##id*)api_send_and_recv(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));
 
 #include "api_commands.h"
 #include "api_requests.h"
@@ -65,10 +65,11 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
 
 bool api_connect(uint8_t endpoint);
 bool api_is_connected(uint8_t endpoint);
-void* api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size);
-void api_send_response(uint8_t endpoint, uint16_t id, void* buffer, uint8_t size);
+void api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size);
+void api_send_response(uint8_t endpoint, uint16_t command, void* buffer, uint8_t size);
+void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size);
+void* api_send_and_recv(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size);
 void api_reset(void);
-
 
 typedef struct {
     // * This should start initiating a physical and transport level connection to the the endpoint.
