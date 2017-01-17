@@ -142,7 +142,7 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (!s_response_sent) {
         res_unhandled unhandled;
         unhandled.original_request = packet->id;
-        api_send_response(endpoint, api_command_unhandled, &unhandled, sizeof(unhandled));
+        API_SEND_RESPONSE(endpoint, unhandled, &unhandled);
     }
 }
 

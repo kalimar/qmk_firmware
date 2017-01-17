@@ -17,10 +17,6 @@
 #ifndef QUANTUM_APIV2_API_H_
 #define QUANTUM_APIV2_API_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -49,26 +45,21 @@ typedef struct __attribute__((packed, aligned(API_ALIGN))) {
         } \
         break;
 
-#ifdef __cplusplus
-} // extern "C"
-    template<typename Request, typename Response>
-    inline Response* api_send_and_recv_helper(uint8_t endpoint, uint16_t command, Request* msg)
-    {
-        return reinterpret_cast<Response*>(api_send_and_recv(endpoint, command, msg, sizeof(Request),
-            sizeof(Response)));
-    }
-#define API_SEND_AND_RECV(endpoint, id, msg) \
-    api_send_and_recv_helper<req_##id, res_##id>(endpoint, api_command_##id, msg)
+#define API_SEND(endpoint, command, msg)  \
+    ({req_##command* req_tmp = msg; \
+    api_send(endpoint, api_command_##command, req_tmp, sizeof(req_##command));})
 
-extern "C" {
+#define API_SEND_RESPONSE(endpoint, command, msg) \
+    ({res_##command* res_tmp = msg; \
+    api_send_response(endpoint, api_command_##command, res_tmp, sizeof(res_##command));})
 
-#else
-#define API_SEND_AND_RECV(endpoint, id, msg) \
-    ({_Static_assert(__builtin_types_compatible_p(__typeof__(msg), req_##id*), \
-        "You didn't pass a pointer of the right message type to API_SEND_AND_RECV"); \
-    (res_##id*)api_send_and_recv(endpoint, api_command_##id, msg, sizeof(req_##id), sizeof(res_##id));})
-#endif
+#define API_RECV_RESPONSE(endpoint, command, msg) \
+    (res_##command*)api_recv_response(endpoint, api_command_##command, sizeof(res_##command))
 
+#define API_SEND_AND_RECV(endpoint, command, msg) \
+    ({req_##command* req_tmp = msg; \
+    (res_##command*)api_send_and_recv(endpoint, api_command_##command, req_tmp, sizeof(req_##command), \
+    		                          sizeof(res_##command));})
 
 #include "api_commands.h"
 #include "api_requests.h"
@@ -127,10 +118,5 @@ void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size);
 void api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
-
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
 
 #endif /* QUANTUM_APIV2_API_H_ */
