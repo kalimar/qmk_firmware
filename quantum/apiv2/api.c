@@ -107,7 +107,7 @@ static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t siz
     }
 }
 
-void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
+static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (size < sizeof(api_packet_t) ) {
         // TODO: Test this
         return;
@@ -193,7 +193,7 @@ void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size) {
         else if (actual_recv_size >= sizeof(api_packet_t) && res->is_response == false) {
             // TODO: This need to be unit tested
             // Now partly unit tested for connection packets
-            api_add_packet(recv_endpoint, res, actual_recv_size);
+            add_packet(recv_endpoint, res, actual_recv_size);
             continue;
         }
         else if (recv_endpoint == endpoint) {
@@ -220,4 +220,15 @@ void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size) {
 void* api_send_and_recv(uint8_t endpoint, uint16_t command, void* data, uint8_t size, uint8_t recv_size) {
     api_send(endpoint, command, data, size);
     return api_recv_response(endpoint, command, recv_size);
+}
+
+void api_process_driver(api_driver_t* driver) {
+    uint8_t size;
+    uint8_t endpoint = API_ENDPOINT_BROADCAST;
+    void* res = driver->recv(&endpoint, &size);
+    while (res) {
+        add_packet(endpoint, res, size);
+        endpoint = API_ENDPOINT_BROADCAST;
+        res = driver->recv(&endpoint, &size);
+    };
 }

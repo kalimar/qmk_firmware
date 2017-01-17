@@ -510,11 +510,20 @@ TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
                 CommandIsResponse(),
                 CommandIs(api_command_connect)
             ))),
-            sizeof(res_connect)))
-    .Times(1).WillOnce(Return(true));
-    api_add_packet(5, &req, sizeof(req));
-}
+            sizeof(res_connect))).
+        Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&req](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 5;
+                *size = sizeof(req);
+                return &req;
+            }
+        )).
+        WillOnce(Return(nullptr));
 
+    api_process_driver(driver.get_driver());
+}
 
 TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
     GetDriverMock mock;
@@ -531,9 +540,18 @@ TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
                 CommandIsResponse(),
                 CommandIs(api_command_connect)
             ))),
-            sizeof(res_connect)))
-    .Times(1).WillOnce(Return(true));
-    api_add_packet(5, &req, sizeof(req));
+            sizeof(res_connect))).
+        Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&req](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 5;
+                *size = sizeof(req);
+                return &req;
+            }
+        )).
+        WillOnce(Return(nullptr));
+    api_process_driver(driver.get_driver());
 }
 
 TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) {
@@ -1000,7 +1018,16 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
             sizeof(res_qmk)
          )
     ).WillOnce(Return(true));
-    api_add_packet(4, &request, sizeof(request));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        )).
+        WillOnce(Return(nullptr));
+     api_process_driver(driver.get_driver());
 }
 
 TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
@@ -1035,7 +1062,16 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
             sizeof(res_keyboard)
          )
     ).WillOnce(Return(true));
-    api_add_packet(4, &request, sizeof(request));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        )).
+        WillOnce(Return(nullptr));
+     api_process_driver(driver.get_driver());
 }
 
 TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
@@ -1070,7 +1106,16 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
             sizeof(res_keymap)
          )
     ).WillOnce(Return(true));
-    api_add_packet(4, &request, sizeof(request));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        )).
+        WillOnce(Return(nullptr));
+     api_process_driver(driver.get_driver());
 }
 
 TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
@@ -1099,7 +1144,16 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
             sizeof(res_unhandled)
          )
     ).WillOnce(Return(true));
-    api_add_packet(4, &request, sizeof(request));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        )).
+        WillOnce(Return(nullptr));
+     api_process_driver(driver.get_driver());
 }
 
 TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
@@ -1136,7 +1190,16 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
             sizeof(res_qmk)
          )
     ).Times(1).WillOnce(Return(true));
-    api_add_packet(4, &request, sizeof(request));
+    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+        WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        )).
+        WillOnce(Return(nullptr));
+     api_process_driver(driver.get_driver());
 }
 
 // TODO: Add tests for other requests during connect

@@ -21,6 +21,7 @@
 #include <stdbool.h>
 
 #define API_ALIGN 4
+#define API_ENDPOINT_BROADCAST 255
 
 // The first two bytes of this structure can never change
 // But you could potentially add more fields if the protocol version is bumped
@@ -91,12 +92,13 @@ typedef struct {
     bool (*send)(uint8_t endpoint, void* buffer, uint8_t size);
 
     // * Should return a buffer if data was received, it then also sets the endpoint and the size
-    // * If endpoint is specified, should perform a blocking read, that is ended by the following condtions
+    // * If endpoint isn't API_ENDPOINT_BROADCAST, should perform a blocking read, that is ended by the
+    //   following conditions
     //   1. Data is received from the specified endpoint
     //   2. Data is received from another endpoint on the same driver
     //   3. The specified endpoint is disconnected
-    // * When no endpoint is specified, it should perform a non-blocking read
-    // * Returns NULL if there's no data to be read, or if the specified endpoint is disconnected
+    // * When the endpoint is API_ENDPOINT_BROADCAST, it should perform a non-blocking read
+    // * Returns NULL if there's no data to be read, or if all endpoints are disconnected
     // * The returned buffer should be valid at least until the next send or recv is performed on the driver
     // * Note the returned data has to be aligned to 4 bytes
     void* (*recv)(uint8_t* endpoint, uint8_t* size);
@@ -105,15 +107,8 @@ typedef struct {
 // The keyboard should implement this, you can return NULL for unsupported endpoints
 api_driver_t* api_get_driver(uint8_t endpoint);
 
-// * The keyboard should call this when an incoming packet is received
-// * Typically this would be implemented by iterating all the drivers once every scan loop and call recv with
-//   a NULL endpoint. If data is received, then you call api_add_packet.
-// * The lifetime for the buffer pointer is the same as the driver, which means that it doesn't necessarily
-//   even have to be valid until the function returns
-// * NOTE: You have to be careful about race conditions, so don't call this directly from an interrupt or
-//   another thread as soon as a packet is received.
-// * Also don't call this function as a response to another driver request, like recv
-void api_add_packet(uint8_t endpoint, void* buffer, uint8_t size);
+// The keyboard should call this once per scan loop for each driver
+void api_process_driver(api_driver_t* driver);
 
 void api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
