@@ -122,6 +122,10 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         // TODO: Test this
         return;
     }
+    // TODO: Should not accept any packets unless the remote is connected
+    // Should also disconnect on the above errors
+    // And report an error back
+    // Note that connected is the incoming connection, not the outgoing one
     s_response_sent = false;
 
     switch (packet->id) {

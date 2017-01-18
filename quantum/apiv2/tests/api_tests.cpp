@@ -168,27 +168,27 @@ public:
     Api() {
         api_reset();
     }
+
+    GetDriverMock get_driver;
+    DriverMock<1> driver1;
 };
 
 TEST_F(Api, ConnectingToANonRegisteredEndpointFails) {
     EXPECT_FALSE(api_is_connected(3));
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(get_driver, get_driver(_)).WillRepeatedly(Return(nullptr));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
 
 TEST_F(Api, ASuccessfulConnection) {
     EXPECT_FALSE(api_is_connected(3));
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver,
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1,
         send(3,
             MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
                 Field(&req_connect::protocol_version, API_PROTOCOL_VERSION),
@@ -198,7 +198,7 @@ TEST_F(Api, ASuccessfulConnection) {
             sizeof(req_connect))
         )
         .Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(3), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(Pointee(3), _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 3;
             *size = sizeof(resp);
@@ -213,37 +213,31 @@ TEST_F(Api, ASuccessfulConnection) {
 
 TEST_F(Api, AFailedConnection) {
     EXPECT_FALSE(api_is_connected(3));
-    GetDriverMock mock;
-    DriverMock<1> driver;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).Times(1).WillOnce(Return(false));
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).Times(1).WillOnce(Return(false));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
 
 TEST_F(Api, AFailedConnectionThroughFailureDuringConnectionPacketSend) {
     EXPECT_FALSE(api_is_connected(3));
-    GetDriverMock mock;
-    DriverMock<1> driver;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(false));
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(false));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
 
 TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
     EXPECT_FALSE(api_is_connected(3));
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 0;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 3;
             *size = sizeof(resp);
@@ -255,18 +249,16 @@ TEST_F(Api, AFailedConnectionDueToRemoteNotAccepting) {
 }
 
 TEST_F(Api, AConnectionFailsWhenTheWrongTypeOfResponseIsReceived) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     // Use the same type of packet so that we know if the id really is checked
     res_connect resp;
     resp.is_response = 1;
     resp.id = 0xDEAD;
     resp.is_response = 1;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 3;
             *size = sizeof(resp);
@@ -278,18 +270,16 @@ TEST_F(Api, AConnectionFailsWhenTheWrongTypeOfResponseIsReceived) {
 }
 
 TEST_F(Api, AConnectionFailsWhenTheResponseHasTheWrongSize) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     // Use the same type of packet so that we know if the id really is checked
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.is_response = 1;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 3;
             *size = sizeof(resp) - 1;
@@ -301,28 +291,24 @@ TEST_F(Api, AConnectionFailsWhenTheResponseHasTheWrongSize) {
 }
 
 TEST_F(Api, AConnectionFailsWhenTheresADisconnectWaitingForResponse) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Return(nullptr));
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Return(nullptr));
     EXPECT_FALSE(api_connect(3));
     EXPECT_FALSE(api_is_connected(3));
 }
 
 TEST_F(Api, ReceivingAResponseFromAnUnrelatedEndpointDoesNothing) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(3)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(3)).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(3, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(get_driver, get_driver(3)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(3)).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(3, _, _)).Times(1).WillOnce(Return(true));
 
-    EXPECT_CALL(driver, recv(_, _)).Times(2)
+    EXPECT_CALL(driver1, recv(_, _)).Times(2)
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
                 *size = sizeof(resp);
@@ -342,16 +328,14 @@ TEST_F(Api, ReceivingAResponseFromAnUnrelatedEndpointDoesNothing) {
 }
 
 TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionResponseFromItDuringConnect) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(_)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -361,7 +345,7 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionRespon
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_is_connected(1));
 
-    EXPECT_CALL(driver, recv( _, _)).Times(2)
+    EXPECT_CALL(driver1, recv( _, _)).Times(2)
         .WillOnce(Invoke(
             [&resp](uint8_t* endpoint, uint8_t* size) {
                 *size = sizeof(resp);
@@ -382,8 +366,6 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedConnectionRespon
 }
 
 TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseFromItDuringConnect) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
@@ -393,10 +375,10 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseF
     general_response.is_response = 1;
     general_response.id = 0xDEAD;
     general_response.successful = 1;
-    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(_)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -406,7 +388,7 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseF
     EXPECT_TRUE(api_connect(1));
     EXPECT_TRUE(api_is_connected(1));
 
-    EXPECT_CALL(driver, recv( _, _)).Times(2)
+    EXPECT_CALL(driver1, recv( _, _)).Times(2)
         .WillOnce(Invoke(
             [&general_response](uint8_t* endpoint, uint8_t* size) {
                 *size = sizeof(general_response);
@@ -428,16 +410,14 @@ TEST_F(Api, AnotherEndpointIsDisconnectedWhenRecievingUnexpectedGeneralResponseF
 }
 
 TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(get_driver, get_driver(1)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(1)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -449,17 +429,15 @@ TEST_F(Api, TryingToConnectWhenAlreadyConnectedDoesNothing) {
 }
 
 TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(1)).Times(2).WillOnce(Return(false)).WillOnce(Return(true));
+    EXPECT_CALL(get_driver, get_driver(1)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(1)).Times(2).WillOnce(Return(false)).WillOnce(Return(true));
     EXPECT_FALSE(api_connect(1));
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -470,16 +448,14 @@ TEST_F(Api, ItsPossibleToConnectAfterAFailedTry) {
 }
 
 TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = 1;
     resp.id = api_command_connect;
     resp.successful = 1;
-    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(_)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, send(_, _, _)).WillRepeatedly(Return(true));
-    EXPECT_CALL(driver, recv(_, _)).WillRepeatedly(Invoke(
+    EXPECT_CALL(get_driver, get_driver(_)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, send(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(driver1, recv(_, _)).WillRepeatedly(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *size = sizeof(resp);
             return &resp;
@@ -496,14 +472,12 @@ TEST_F(Api, ConnectionFailsWhenTooManyConcurrentConnectionsAreOpened) {
 }
 
 TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     req_connect req;
     req.id = api_command_connect;
     req.is_response = 0;
     req.protocol_version = API_PROTOCOL_VERSION;
-    EXPECT_CALL(mock, get_driver(5)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver,
+    EXPECT_CALL(get_driver, get_driver(5)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1,
         send(5,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 Field(&res_connect::successful, 1),
@@ -512,7 +486,7 @@ TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
             ))),
             sizeof(res_connect))).
         Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&req](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 5;
@@ -522,18 +496,16 @@ TEST_F(Api, AnIncommingConnectionWithTheCorrectVersionIsAccepted) {
         )).
         WillOnce(Return(nullptr));
 
-    api_process_driver(driver.get_driver());
+    api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     req_connect req;
     req.id = api_command_connect;
     req.is_response = 0;
     req.protocol_version = 0xDEAD;
-    EXPECT_CALL(mock, get_driver(5)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver,
+    EXPECT_CALL(get_driver, get_driver(5)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1,
         send(5,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 Field(&res_connect::successful, 0),
@@ -542,7 +514,7 @@ TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
             ))),
             sizeof(res_connect))).
         Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&req](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 5;
@@ -551,12 +523,10 @@ TEST_F(Api, AnIncommingConnectionWithTheWrongVersionIsNotAccepted) {
             }
         )).
         WillOnce(Return(nullptr));
-    api_process_driver(driver.get_driver());
+    api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = true;
     resp.id = api_command_connect;
@@ -566,12 +536,12 @@ TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) 
     req.is_response = false;
     req.id = api_command_connect;
     req.protocol_version = API_PROTOCOL_VERSION;
-    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(1)).WillRepeatedly(Return(driver1.get_driver()));
     InSequence s;
     // Connect the endpoint
-    EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, connect(1)).Times(1).WillOnce(Return(true));
     // Send the request
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
                 CommandIsRequest(),
@@ -580,7 +550,7 @@ TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) 
             sizeof(req_connect))
     ).Times(1).WillOnce(Return(true));
     // Receive the connection request from the remote, before we have received our response
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&req](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(req);
@@ -588,7 +558,7 @@ TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) 
         }
     ));
     // Send the response
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 CommandIsResponse(),
@@ -597,7 +567,7 @@ TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) 
             sizeof(res_connect))
     ).Times(1);
     // Receive the response for our outgoing request
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -608,8 +578,6 @@ TEST_F(Api, AnIncommingConnectionFromTheSameEndpointCanBeAcceptedDuringConnect) 
 }
 
 TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
     res_connect resp;
     resp.is_response = true;
     resp.id = api_command_connect;
@@ -619,12 +587,12 @@ TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) 
     req.is_response = false;
     req.id = api_command_connect;
     req.protocol_version = API_PROTOCOL_VERSION;
-    EXPECT_CALL(mock, get_driver(_)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(_)).WillRepeatedly(Return(driver1.get_driver()));
     InSequence s;
     // Connect the endpoint
-    EXPECT_CALL(driver, connect(1)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, connect(1)).Times(1).WillOnce(Return(true));
     // Send the request
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
                 CommandIsRequest(),
@@ -633,7 +601,7 @@ TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) 
             sizeof(req_connect))
     ).Times(1).WillOnce(Return(true));
     // Receive the connection request from the remote, before we have received our response
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&req](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 2;
             *size = sizeof(req);
@@ -641,7 +609,7 @@ TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) 
         }
     ));
     // Send the response
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(2,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 CommandIsResponse(),
@@ -650,7 +618,7 @@ TEST_F(Api, AnIncommingConnectionFromAnotherEndpointCanBeAcceptedDuringConnect) 
             sizeof(res_connect))
     ).Times(1);
     // Receive the response for our outgoing request
-    EXPECT_CALL(driver, recv(_, _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(_, _)).Times(1).WillOnce(Invoke(
         [&resp](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(resp);
@@ -672,9 +640,9 @@ public:
         resp.is_response = 1;
         resp.id = api_command_connect;
         resp.successful = 1;
-        EXPECT_CALL(mock, get_driver(endpoint)).WillRepeatedly(Return(driver.get_driver()));
-        EXPECT_CALL(driver, connect(endpoint)).Times(1).WillOnce(Return(true));
-        EXPECT_CALL(driver,
+        EXPECT_CALL(get_driver, get_driver(endpoint)).WillRepeatedly(Return(driver1.get_driver()));
+        EXPECT_CALL(driver1, connect(endpoint)).Times(1).WillOnce(Return(true));
+        EXPECT_CALL(driver1,
             send(endpoint,
                 MatcherCast<void*>(MatcherCast<req_connect*>(AllOf(
                     Field(&req_connect::protocol_version, API_PROTOCOL_VERSION),
@@ -683,7 +651,7 @@ public:
                 ))),
                 sizeof(req_connect))
         ).WillOnce(Return(true));
-        EXPECT_CALL(driver, recv(Pointee(endpoint), _)).Times(1).WillOnce(Invoke(
+        EXPECT_CALL(driver1, recv(Pointee(endpoint), _)).Times(1).WillOnce(Invoke(
             [&resp, ep=endpoint](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = ep;
                 *size = sizeof(resp);
@@ -693,10 +661,6 @@ public:
         EXPECT_TRUE(api_connect(endpoint));
         EXPECT_TRUE(api_is_connected(endpoint));
     }
-
-    GetDriverMock mock;
-    DriverMock<1> driver;
-
 };
 
 TEST_F(ConnectedApi, SuccessfulSendAndReceive) {
@@ -708,7 +672,7 @@ TEST_F(ConnectedApi, SuccessfulSendAndReceive) {
     response.is_response = true;
     response.response = 12;
 
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<req_qmk*>(AllOf(
                 Field(&req_qmk::request, 37),
@@ -717,7 +681,7 @@ TEST_F(ConnectedApi, SuccessfulSendAndReceive) {
             ))),
             sizeof(req_qmk))
     ).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(response);
@@ -734,7 +698,7 @@ TEST_F(ConnectedApi, AFailedSendReturnsNullAndDisconnects) {
     req_qmk request;
     request.request = 37;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(false));
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(false));
     auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     ASSERT_FALSE(api_is_connected(1));
@@ -744,8 +708,8 @@ TEST_F(ConnectedApi, AFailedReceiveOfResponseReturnsNullAndDisconnects) {
     req_qmk request;
     request.request = 37;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Return(nullptr));
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Return(nullptr));
     auto* received_resp = API_SEND_AND_RECV(1, qmk, &request);
     ASSERT_EQ(received_resp, nullptr);
     ASSERT_FALSE(api_is_connected(1));
@@ -755,8 +719,8 @@ TEST_F(ConnectedApi, AFailedReceiveOfResponseWithAnyEndpointReturnsNullAndDiscon
     req_qmk request;
     request.request = 37;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [](uint8_t* endpoint, uint8_t* size) {
             // Set the endpoint to something else, to make sure that it's still handled correctly
             // Even if the driver doesn't set it
@@ -771,11 +735,9 @@ TEST_F(ConnectedApi, AFailedReceiveOfResponseWithAnyEndpointReturnsNullAndDiscon
 
 
 TEST_F(Api, ASendFailsForADisconnectedEndpoint) {
-    GetDriverMock mock;
-    DriverMock<1> driver;
-    EXPECT_CALL(mock, get_driver(1)).WillRepeatedly(Return(driver.get_driver()));
-    EXPECT_CALL(driver, connect(1)).Times(0);
-    EXPECT_CALL(driver, send(1, _, _)).Times(0);
+    EXPECT_CALL(get_driver, get_driver(1)).WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1, connect(1)).Times(0);
+    EXPECT_CALL(driver1, send(1, _, _)).Times(0);
     req_qmk request;
     request.request = 37;
     auto* resp = API_SEND_AND_RECV(1, qmk, &request);
@@ -785,7 +747,7 @@ TEST_F(Api, ASendFailsForADisconnectedEndpoint) {
 TEST_F(ConnectedApi, TryingToSendATooSmallPacketReturnsNullAndDisconnects) {
     uint8_t request;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(0);
+    EXPECT_CALL(driver1, send(1, _, _)).Times(0);
     auto* res = api_send_and_recv(1, api_command_qmk, &request, 1, sizeof(res_qmk));
     EXPECT_EQ(res, nullptr);
     EXPECT_FALSE(api_is_connected(1));
@@ -800,8 +762,8 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongIdFailsAndDisconnects) {
     response.is_response = true;
     response.response = 12;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(response);
@@ -822,8 +784,8 @@ TEST_F(ConnectedApi, ReceivingAResponseWithTheWrongSizeFailsAndDisconnects) {
     response.is_response = true;
     response.response = 12;
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(response) + 3;
@@ -846,8 +808,8 @@ TEST_F(ConnectedApi, ReceivingAResponseFromTheWrongEndpointWillDisconnectItButTh
 
     connect_endpoint(4);
 
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(2).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(2).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 4;
             *size = sizeof(response);
@@ -875,7 +837,7 @@ TEST_F(ConnectedApi, AnUhandledRequestsReturnsNullToTheSenderAndDisconnects) {
     unhandled.is_response = true;
     unhandled.original_request = api_command_qmk;
 
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<req_qmk*>(AllOf(
                 Field(&req_qmk::request, 37),
@@ -884,7 +846,7 @@ TEST_F(ConnectedApi, AnUhandledRequestsReturnsNullToTheSenderAndDisconnects) {
             ))),
             sizeof(req_qmk))
     ).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).Times(1).WillOnce(Invoke(
         [&unhandled](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(unhandled);
@@ -911,15 +873,15 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromTheSameEndpointIsAcceptedDur
     response.response = 12;
 
     InSequence s;
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).WillOnce(Invoke(
         [&con_req](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(con_req);
             return &con_req;
         }
     ));
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(1,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 CommandIsResponse(),
@@ -927,7 +889,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromTheSameEndpointIsAcceptedDur
             ))),
             sizeof(res_connect))
     ).Times(1);
-    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(response);
@@ -952,18 +914,18 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
     response.is_response = true;
     response.response = 12;
 
-    EXPECT_CALL(mock, get_driver(7)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(7)).WillRepeatedly(Return(driver1.get_driver()));
 
     InSequence s;
-    EXPECT_CALL(driver, send(1, _, _)).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+    EXPECT_CALL(driver1, send(1, _, _)).Times(1).WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).WillOnce(Invoke(
         [&con_req](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 7;
             *size = sizeof(con_req);
             return &con_req;
         }
     ));
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(7,
             MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
                 CommandIsResponse(),
@@ -972,7 +934,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
             sizeof(res_connect)
         )
     ).Times(1);
-    EXPECT_CALL(driver, recv(Pointee(1), _)).WillOnce(Invoke(
+    EXPECT_CALL(driver1, recv(Pointee(1), _)).WillOnce(Invoke(
         [&response](uint8_t* endpoint, uint8_t* size) {
             *endpoint = 1;
             *size = sizeof(response);
@@ -990,9 +952,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     request.is_response = false;
     request.request = 12;
 
-    DriverMock<1> driver;
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
 
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
         res->response = 42;
@@ -1008,7 +968,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     );
     EXPECT_CALL(process, api_process_keyboard(_, _, _)).Times(0);
     EXPECT_CALL(process, api_process_keymap(_, _, _)).Times(0);
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(4,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
                 CommandIsResponse(),
@@ -1018,7 +978,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
             sizeof(res_qmk)
          )
     ).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 4;
@@ -1027,7 +987,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
             }
         )).
         WillOnce(Return(nullptr));
-     api_process_driver(driver.get_driver());
+     api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
@@ -1036,9 +996,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
     request.id = api_command_keyboard;
     request.is_response = false;
 
-    DriverMock<1> driver;
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
 
     auto handle_keyboard = [](uint8_t endpoint, req_keyboard* req, res_keyboard* res) {
     };
@@ -1053,7 +1011,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
     );
     EXPECT_CALL(process, api_process_qmk(_, _, _)).Times(0);
     EXPECT_CALL(process, api_process_keymap(_, _, _)).Times(0);
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(4,
             MatcherCast<void*>(MatcherCast<res_keyboard*>(AllOf(
                 CommandIsResponse(),
@@ -1062,7 +1020,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
             sizeof(res_keyboard)
          )
     ).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 4;
@@ -1071,7 +1029,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
             }
         )).
         WillOnce(Return(nullptr));
-     api_process_driver(driver.get_driver());
+     api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
@@ -1080,9 +1038,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
     request.id = api_command_keymap;
     request.is_response = false;
 
-    DriverMock<1> driver;
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
 
     auto handle_keymap = [](uint8_t endpoint, req_keymap* req, res_keymap* res) {
     };
@@ -1097,7 +1053,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
     );
     EXPECT_CALL(process, api_process_qmk(_, _, _)).Times(0);
     EXPECT_CALL(process, api_process_keyboard(_, _, _)).Times(0);
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(4,
             MatcherCast<void*>(MatcherCast<res_keymap*>(AllOf(
                 CommandIsResponse(),
@@ -1106,7 +1062,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
             sizeof(res_keymap)
          )
     ).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 4;
@@ -1115,7 +1071,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
             }
         )).
         WillOnce(Return(nullptr));
-     api_process_driver(driver.get_driver());
+     api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
@@ -1125,16 +1081,14 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
     request.is_response = false;
     request.request = 12;
 
-    DriverMock<1> driver;
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
 
     EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
     .WillOnce(Invoke(
         [](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
         })
     );
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(4,
             MatcherCast<void*>(MatcherCast<res_unhandled*>(AllOf(
                 CommandIsResponse(),
@@ -1144,7 +1098,7 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
             sizeof(res_unhandled)
          )
     ).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 4;
@@ -1153,7 +1107,7 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
             }
         )).
         WillOnce(Return(nullptr));
-     api_process_driver(driver.get_driver());
+     api_process_driver(driver1.get_driver());
 }
 
 TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
@@ -1163,9 +1117,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
     request.is_response = false;
     request.request = 12;
 
-    DriverMock<1> driver;
-    GetDriverMock mock;
-    EXPECT_CALL(mock, get_driver(4)).WillRepeatedly(Return(driver.get_driver()));
+    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
 
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
         res->response = 42;
@@ -1180,7 +1132,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
             }
         })
     );
-    EXPECT_CALL(driver,
+    EXPECT_CALL(driver1,
         send(4,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
                 CommandIsResponse(),
@@ -1190,7 +1142,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
             sizeof(res_qmk)
          )
     ).Times(1).WillOnce(Return(true));
-    EXPECT_CALL(driver, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _)).Times(2).
         WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 4;
@@ -1199,7 +1151,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
             }
         )).
         WillOnce(Return(nullptr));
-     api_process_driver(driver.get_driver());
+     api_process_driver(driver1.get_driver());
 }
 
 // TODO: Add tests for other requests during connect
