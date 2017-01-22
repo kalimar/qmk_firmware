@@ -1315,4 +1315,68 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
      api_process_driver(driver1.get_driver());
 }
 
+TEST_F(Api, ATooSmallIncomingPacketReturnsProtocolError) {
+    ProcessApiMock process;
+    uint8_t buffer[1];
+
+    EXPECT_CALL(get_driver, get_driver(4))
+        .WillRepeatedly(Return(driver1.get_driver()));
+
+    EXPECT_CALL(process, api_process_qmk(_,_,_))
+        .Times(0);
+    EXPECT_CALL(driver1,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_INCOMING_TOO_SMALL)
+            ))),
+            sizeof(res_protocol_error)
+         ))
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+        .Times(2)
+        .WillOnce(Invoke(
+            [&buffer](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = 1;
+                return buffer;
+            }
+        ))
+        .WillOnce(Return(nullptr));
+     api_process_driver(driver1.get_driver());
+}
+
+TEST_F(Api, AnUnexpectedResponseReturnsProtocolError) {
+    ProcessApiMock process;
+    res_qmk res;
+
+    EXPECT_CALL(get_driver, get_driver(4))
+        .WillRepeatedly(Return(driver1.get_driver()));
+
+    EXPECT_CALL(process, api_process_qmk(_,_,_))
+        .Times(0);
+    EXPECT_CALL(driver1,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_UNEXPECTED_RESPONSE)
+            ))),
+            sizeof(res_protocol_error)
+         ))
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+        .Times(2)
+        .WillOnce(Invoke(
+            [&res](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(res);
+                return &res;
+            }
+        ))
+        .WillOnce(Return(nullptr));
+     api_process_driver(driver1.get_driver());
+}
+
 // TODO: Add tests for other requests during connect

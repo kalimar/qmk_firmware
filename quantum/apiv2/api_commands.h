@@ -20,7 +20,11 @@
 enum api_commands {
     api_internal_begin=0,
     api_command_connect,
+    // If you receive any of these responses, you should disconnect and reconnect
+    // **************************
     api_command_unhandled, // Only valid as a response, returned when the remote doesn't handle the request
+    api_command_protocol_error, // Returned when there is an unspecified protocol error
+    // **************************
     api_internal_end=15,
     api_qmk_begin=16,
     // Don't add anything before this line

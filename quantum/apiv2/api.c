@@ -21,7 +21,7 @@
 #error Please define API_MAX_CONNECTED_ENDPOINTS
 #endif
 
-#define NOT_CONNECTED 255
+#define NOT_CONNECTED API_ENDPOINT_BROADCAST
 
 static uint8_t outgoing_connections[API_MAX_CONNECTED_ENDPOINTS] = {
     [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = NOT_CONNECTED
@@ -109,23 +109,27 @@ static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t siz
 
 static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
     if (size < sizeof(api_packet_t) ) {
-        // TODO: Test this
+        res_protocol_error res;
+        res.error = PROTOCOL_ERROR_INCOMING_TOO_SMALL;
+        API_SEND_RESPONSE(endpoint, protocol_error, &res);
         return;
     }
     if (((uintptr_t)(buffer) % API_ALIGN) != 0) {
-        // TODO: Add similar tests to the sending function
+        //TODO: Bad alignment should actually be supported
+        //Also for api_recv_response
         return;
     }
     api_packet_t* packet = (api_packet_t*)(buffer);
     // We should not receive responses if we are not waiting for it
     if (packet->is_response) {
-        // TODO: Test this
+        res_protocol_error res;
+        res.error = PROTOCOL_ERROR_UNEXPECTED_RESPONSE;
+        API_SEND_RESPONSE(endpoint, protocol_error, &res);
         return;
     }
     // TODO: Should not accept any packets unless the remote is connected
     // Should also disconnect on the above errors
-    // And report an error back
-    // Note that connected is the incoming connection, not the outgoing one
+    // Note that connected here means the the incoming connection, not the outgoing one
     s_response_sent = false;
 
     switch (packet->id) {

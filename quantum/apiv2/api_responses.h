@@ -27,5 +27,12 @@ BEGIN_MSG
     uint8_t original_request; // The command id for the request that was unhandled
 END_MSG(res_unhandled);
 
+enum ProtocolError {
+    PROTOCOL_ERROR_INCOMING_TOO_SMALL,
+    PROTOCOL_ERROR_UNEXPECTED_RESPONSE,
+};
+BEGIN_MSG
+    uint8_t error;
+END_MSG(res_protocol_error);
 
 #endif /* QUANTUM_APIV2_API_RESPONSES_H_ */
