@@ -22,6 +22,10 @@
 
 #define API_ALIGN 4
 #define API_ENDPOINT_BROADCAST 255
+#define API_MAX_SIZE 32
+// If the driver automatically aligns the packet, then you can define this in your keyboard
+// This would save API_MAX_SIZE bytes of memory
+//#define API_DRIVER_ALIGNS
 
 // The first two bytes of this structure can never change
 // But you could potentially add more fields if the protocol version is bumped

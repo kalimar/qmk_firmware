@@ -16,6 +16,7 @@
 
 #include "api.h"
 #include <stddef.h>
+#include <string.h>
 
 #ifndef API_MAX_CONNECTED_ENDPOINTS
 #error Please define API_MAX_CONNECTED_ENDPOINTS
@@ -26,6 +27,8 @@
 static uint8_t outgoing_connections[API_MAX_CONNECTED_ENDPOINTS] = {
     [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = NOT_CONNECTED
 };
+
+static uint8_t aligned_packet[API_MAX_SIZE] __attribute__((aligned(API_ALIGN)));
 
 static bool s_response_sent = false;
 
@@ -114,11 +117,17 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         API_SEND_RESPONSE(endpoint, protocol_error, &res);
         return;
     }
+
     if (((uintptr_t)(buffer) % API_ALIGN) != 0) {
-        //TODO: Bad alignment should actually be supported
-        //Also for api_recv_response
-        return;
+        #if API_DRIVER_ALIGNS
+            return;
+        #else
+            uint8_t s = size > API_MAX_SIZE ? API_MAX_SIZE : size;
+            memcpy(aligned_packet, buffer, s);
+            buffer = aligned_packet;
+        #endif
     }
+
     api_packet_t* packet = (api_packet_t*)(buffer);
     // We should not receive responses if we are not waiting for it
     if (packet->is_response) {
@@ -198,7 +207,18 @@ void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size) {
         if (!res)  {
             connected = false;
         }
-        else if (actual_recv_size >= sizeof(api_packet_t) && res->is_response == false) {
+
+        if (((uintptr_t)(res) % API_ALIGN) != 0) {
+            #if API_DRIVER_ALIGNS
+                connected = false;
+            #else
+                uint8_t s = actual_recv_size > API_MAX_SIZE ? API_MAX_SIZE : actual_recv_size;
+                memcpy(aligned_packet, res, s);
+                res = (api_packet_t*)(aligned_packet);
+            #endif
+        }
+
+        if (actual_recv_size >= sizeof(api_packet_t) && res->is_response == false) {
             // TODO: This need to be unit tested
             // Now partly unit tested for connection packets
             add_packet(recv_endpoint, res, actual_recv_size);

@@ -1379,4 +1379,81 @@ TEST_F(Api, AnUnexpectedResponseReturnsProtocolError) {
      api_process_driver(driver1.get_driver());
 }
 
+TEST_F(ConnectedApi, AnUnalignedResponseIsAutomaticallyAligned) {
+    req_qmk req;
+    res_qmk outgoing_res;
+    outgoing_res.id = api_command_qmk;
+    outgoing_res.is_response = true;
+    outgoing_res.response = 42;
+    uint8_t buffer[sizeof(outgoing_res) + 1];
+    memcpy(buffer + 1, &outgoing_res, sizeof(outgoing_res));
+
+    EXPECT_CALL(driver1, send(1, _, _))
+        .Times(1)
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(1), _))
+        .WillOnce(Invoke(
+            [&buffer](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                *size = sizeof(res_qmk);
+                return buffer + 1;
+            }
+        ));
+    auto* res = API_SEND_AND_RECV(1, qmk, &req);
+    EXPECT_NE(nullptr, res);
+    EXPECT_EQ(0, reinterpret_cast<uintptr_t>(res) % API_ALIGN);
+    EXPECT_EQ(42, res->response);
+}
+
+TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
+    ProcessApiMock process;
+
+    req_qmk req;
+    req.id = api_command_qmk;
+    req.is_response = false;
+    req.request = 42;
+    uint8_t buffer[sizeof(req) + 1];
+    memcpy(buffer + 1, &req, sizeof(req));
+
+    EXPECT_CALL(get_driver, get_driver(4))
+        .WillRepeatedly(Return(driver1.get_driver()));
+
+    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+        EXPECT_EQ(0, reinterpret_cast<uintptr_t>(req) % API_ALIGN);
+        EXPECT_EQ(42, req->request);
+        res->response = 10;
+        API_SEND_RESPONSE(endpoint, qmk, res);
+    };
+
+    EXPECT_CALL(process, api_process_qmk(4, _, _))
+        .WillOnce(Invoke(
+            [&handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
+                switch (packet->id) {
+                    API_HANDLE(qmk, handle_qmk);
+                }
+            }
+        ));
+    EXPECT_CALL(driver1,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_qmk),
+                Field(&res_qmk::response, 10)
+            ))),
+            sizeof(res_qmk)
+         ))
+        .Times(1)
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+        .Times(2)
+        .WillOnce(Invoke(
+            [&buffer](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(req_qmk);
+                return buffer + 1;
+            }
+        ))
+        .WillOnce(Return(nullptr));
+     api_process_driver(driver1.get_driver());
+}
 // TODO: Add tests for other requests during connect
