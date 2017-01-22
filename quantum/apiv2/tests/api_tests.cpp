@@ -1298,7 +1298,7 @@ TEST_F(RemotelyConnectedApi, AnAcceptedIncomingKeymapRequestReturnsTheCorrectRes
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(RemotelyConnectedApi, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
+TEST_F(RemotelyConnectedApi, AnUnhandledIncomingQMKRequestReturnsUnhandledAndDisconnects) {
     ProcessApiMock process;
     req_qmk request;
     request.id = api_command_qmk;
@@ -1306,6 +1306,7 @@ TEST_F(RemotelyConnectedApi, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
     request.request = 12;
 
     EXPECT_CALL(process, api_process_qmk(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+        .Times(1)
         .WillOnce(Invoke(
             [](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
             })
@@ -1319,9 +1320,29 @@ TEST_F(RemotelyConnectedApi, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
             ))),
             sizeof(res_unhandled)
          ))
+        .Times(1)
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1,
+        send(1,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_NOT_CONNECTED)
+            ))),
+            sizeof(res_unhandled)
+         ))
+        .Times(1)
         .WillOnce(Return(true));
     EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
-        .Times(2)
+        .Times(3)
+        .WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                *size = sizeof(request);
+                return &request;
+            }
+        ))
+        // Should not be processed
         .WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 1;
@@ -1380,6 +1401,10 @@ TEST_F(RemotelyConnectedApi, AResponseIsOnlySentOnceEvenIfCalledTwice) {
 TEST_F(RemotelyConnectedApi, ATooSmallIncomingPacketReturnsProtocolError) {
     ProcessApiMock process;
     uint8_t buffer[1];
+    req_qmk disconnected_request;
+    disconnected_request.id = api_command_qmk;
+    disconnected_request.is_response = false;
+    disconnected_request.request = 12;
 
     EXPECT_CALL(process, api_process_qmk(_,_,_))
         .Times(0);
@@ -1393,13 +1418,31 @@ TEST_F(RemotelyConnectedApi, ATooSmallIncomingPacketReturnsProtocolError) {
             sizeof(res_protocol_error)
          ))
         .WillOnce(Return(true));
+    EXPECT_CALL(driver1,
+        send(1,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_NOT_CONNECTED)
+            ))),
+            sizeof(res_unhandled)
+         ))
+        .Times(1)
+        .WillOnce(Return(true));
     EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
-        .Times(2)
         .WillOnce(Invoke(
             [&buffer](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 1;
                 *size = 1;
                 return buffer;
+            }
+        ))
+        // Should not be processed
+        .WillOnce(Invoke(
+            [&disconnected_request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                *size = sizeof(disconnected_request);
+                return &disconnected_request;
             }
         ))
         .WillOnce(Return(nullptr));
@@ -1411,6 +1454,11 @@ TEST_F(RemotelyConnectedApi, AnUnexpectedResponseReturnsProtocolError) {
     res_qmk res;
     res.is_response = true;
     res.id = api_command_qmk;
+
+    req_qmk disconnected_request;
+    disconnected_request.id = api_command_qmk;
+    disconnected_request.is_response = false;
+    disconnected_request.request = 12;
 
     EXPECT_CALL(process, api_process_qmk(_,_,_))
         .Times(0);
@@ -1424,13 +1472,31 @@ TEST_F(RemotelyConnectedApi, AnUnexpectedResponseReturnsProtocolError) {
             sizeof(res_protocol_error)
          ))
         .WillOnce(Return(true));
+    EXPECT_CALL(driver1,
+        send(1,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_NOT_CONNECTED)
+            ))),
+            sizeof(res_unhandled)
+         ))
+        .Times(1)
+        .WillOnce(Return(true));
     EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
-        .Times(2)
         .WillOnce(Invoke(
             [&res](uint8_t* endpoint, uint8_t* size) {
                 *endpoint = 1;
                 *size = sizeof(res);
                 return &res;
+            }
+        ))
+        // Should not be processed
+        .WillOnce(Invoke(
+            [&disconnected_request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 1;
+                *size = sizeof(disconnected_request);
+                return &disconnected_request;
             }
         ))
         .WillOnce(Return(nullptr));

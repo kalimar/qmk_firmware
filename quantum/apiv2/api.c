@@ -107,12 +107,16 @@ void api_reset(void) {
 
 static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_connect* resp) {
     resp->successful = false;
+    uint8_t* connection = get_or_reserve_connection(endpoint, incoming_connections);
     if (req->protocol_version == API_PROTOCOL_VERSION) {
-        uint8_t* connection = get_or_reserve_connection(endpoint, incoming_connections);
         if (connection) {
             resp->successful = true;
             *connection = endpoint;
         }
+    }
+    else if (connection) {
+        // TODO: This case could be unit tested
+        *connection = NOT_CONNECTED;
     }
 }
 
@@ -131,6 +135,7 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
             res_protocol_error res;
             res.error = PROTOCOL_ERROR_INCOMING_TOO_SMALL;
             API_SEND_RESPONSE(endpoint, protocol_error, &res);
+            disconnect_endpoint(endpoint, incoming_connections);
         }
         return;
     }
@@ -160,10 +165,9 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         res_protocol_error res;
         res.error = PROTOCOL_ERROR_UNEXPECTED_RESPONSE;
         API_SEND_RESPONSE(endpoint, protocol_error, &res);
+        disconnect_endpoint(endpoint, incoming_connections);
         return;
     }
-    // TODO: Should disconnect the remote on the above errors
-    // Note that connected here means the the incoming connection, not the outgoing one
 
     switch (packet->id) {
     case api_internal_begin ... api_internal_end:
@@ -184,6 +188,7 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         res_unhandled unhandled;
         unhandled.original_request = packet->id;
         API_SEND_RESPONSE(endpoint, unhandled, &unhandled);
+        disconnect_endpoint(endpoint, incoming_connections);
     }
 }
 
