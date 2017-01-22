@@ -1514,4 +1514,41 @@ TEST_F(RemotelyConnectedApi, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
         .WillOnce(Return(nullptr));
      api_process_driver(driver1.get_driver());
 }
+
+TEST_F(RemotelyConnectedApi, TooManyIncomingConnectionsAreNotAccepted) {
+    // The fixture already connects one
+    for (int i=0;i<API_MAX_CONNECTED_ENDPOINTS;i++) {
+        connect(i);
+    }
+    uint8_t id = API_MAX_CONNECTED_ENDPOINTS + 1;
+    req_connect req;
+    req.id = api_command_connect;
+    req.is_response = false;
+    req.protocol_version = API_PROTOCOL_VERSION;
+
+    EXPECT_CALL(get_driver, get_driver(id))
+        .WillRepeatedly(Return(driver1.get_driver()));
+    EXPECT_CALL(driver1,
+        send(id,
+            MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                Field(&res_connect::successful, false),
+                CommandIsResponse(),
+                CommandIs(api_command_connect)
+            ))),
+            sizeof(res_connect)))
+        .Times(1)
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+        .Times(2).
+        WillOnce(Invoke(
+            [&req, id](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = id;
+                *size = sizeof(req);
+                return &req;
+            }
+        )).
+        WillOnce(Return(nullptr));
+    api_process_driver(driver1.get_driver());
+}
+
 // TODO: Add tests for other requests during connect

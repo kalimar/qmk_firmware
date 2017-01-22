@@ -109,7 +109,6 @@ static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_con
     resp->successful = false;
     if (req->protocol_version == API_PROTOCOL_VERSION) {
         uint8_t* connection = get_or_reserve_connection(endpoint, incoming_connections);
-        //TODO: Test the case where no connection could be reserved
         if (connection) {
             resp->successful = true;
             *connection = endpoint;
