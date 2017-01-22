@@ -1092,7 +1092,7 @@ TEST_F(ConnectedApi, AnIncomingConnectionRequestFromADifferentEndpointIsAccepted
     EXPECT_NE(received_resp, nullptr);
 }
 
-TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
+TEST_F(Api, AnUnconnectedIncomingPacketReturnsProtocolError) {
     ProcessApiMock process;
     req_qmk request;
     request.id = api_command_qmk;
@@ -1102,11 +1102,83 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     EXPECT_CALL(get_driver, get_driver(4))
         .WillRepeatedly(Return(driver1.get_driver()));
 
+    EXPECT_CALL(process, api_process_qmk(_,_,_))
+        .Times(0);
+    EXPECT_CALL(driver1,
+        send(4,
+            MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
+                CommandIsResponse(),
+                CommandIs(api_command_protocol_error),
+                Field(&res_protocol_error::error, PROTOCOL_ERROR_NOT_CONNECTED)
+            ))),
+            sizeof(res_protocol_error)
+         ))
+        .WillOnce(Return(true));
+    EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+        .Times(2)
+        .WillOnce(Invoke(
+            [&request](uint8_t* endpoint, uint8_t* size) {
+                *endpoint = 4;
+                *size = sizeof(request);
+                return &request;
+            }
+        ))
+        .WillOnce(Return(nullptr));
+     api_process_driver(driver1.get_driver());
+}
+
+class RemotelyConnectedApi : public Api {
+public:
+    RemotelyConnectedApi() {
+        connect(1);
+    }
+
+    void connect(uint8_t endpoint) {
+        req_connect req;
+        req.id = api_command_connect;
+        req.is_response = 0;
+        req.protocol_version = API_PROTOCOL_VERSION;
+
+        EXPECT_CALL(get_driver, get_driver(endpoint))
+            .WillRepeatedly(Return(driver1.get_driver()));
+        EXPECT_CALL(driver1,
+            send(endpoint,
+                MatcherCast<void*>(MatcherCast<res_connect*>(AllOf(
+                    Field(&res_connect::successful, 1),
+                    CommandIsResponse(),
+                    CommandIs(api_command_connect)
+                ))),
+                sizeof(res_connect)))
+            .Times(1)
+            .WillOnce(Return(true));
+        EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
+            .Times(2)
+            .WillOnce(Invoke(
+                [&req, endpoint](uint8_t* e, uint8_t* size) {
+                    *e = endpoint;
+                    *size = sizeof(req);
+                    return &req;
+                }
+            ))
+            .WillOnce(Return(nullptr));
+
+         api_process_driver(driver1.get_driver());
+    }
+};
+
+
+TEST_F(RemotelyConnectedApi, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
+    ProcessApiMock process;
+    req_qmk request;
+    request.id = api_command_qmk;
+    request.is_response = false;
+    request.request = 12;
+
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
         res->response = 42;
     };
 
-    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    EXPECT_CALL(process, api_process_qmk(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
         .WillOnce(Invoke(
             [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
@@ -1119,7 +1191,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     EXPECT_CALL(process, api_process_keymap(_, _, _))
         .Times(0);
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_qmk),
@@ -1131,7 +1203,7 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
     EXPECT_CALL(driver1, recv(Pointee(API_ENDPOINT_BROADCAST), _))
         .Times(2).WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(request);
                 return &request;
             }
@@ -1140,19 +1212,16 @@ TEST_F(Api, AnAcceptedIncomingQMKRequestReturnsTheCorrectResponse) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
+TEST_F(RemotelyConnectedApi, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
     ProcessApiMock process;
     req_keyboard request;
     request.id = api_command_keyboard;
     request.is_response = false;
 
-    EXPECT_CALL(get_driver, get_driver(4))
-        .WillRepeatedly(Return(driver1.get_driver()));
-
     auto handle_keyboard = [](uint8_t endpoint, req_keyboard* req, res_keyboard* res) {
     };
 
-    EXPECT_CALL(process, api_process_keyboard(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    EXPECT_CALL(process, api_process_keyboard(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
         .WillOnce(Invoke(
             [handle_keyboard](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
@@ -1165,7 +1234,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
     EXPECT_CALL(process, api_process_keymap(_, _, _))
         .Times(0);
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_keyboard*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_keyboard)
@@ -1177,7 +1246,7 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
         .Times(2)
         .WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(request);
                 return &request;
             }
@@ -1186,18 +1255,16 @@ TEST_F(Api, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectResponse) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
+TEST_F(RemotelyConnectedApi, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
     ProcessApiMock process;
     req_keyboard request;
     request.id = api_command_keymap;
     request.is_response = false;
 
-    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
-
     auto handle_keymap = [](uint8_t endpoint, req_keymap* req, res_keymap* res) {
     };
 
-    EXPECT_CALL(process, api_process_keymap(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    EXPECT_CALL(process, api_process_keymap(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
         .WillOnce(Invoke(
             [handle_keymap](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
@@ -1210,7 +1277,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
     EXPECT_CALL(process, api_process_keyboard(_, _, _))
         .Times(0);
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_keymap*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_keymap)
@@ -1222,7 +1289,7 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
         .Times(2)
         .WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(request);
                 return &request;
             }
@@ -1231,23 +1298,20 @@ TEST_F(Api, AnAcceptedIncomingKeymapRequestReturnsTheCorrectResponse) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
+TEST_F(RemotelyConnectedApi, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
     ProcessApiMock process;
     req_qmk request;
     request.id = api_command_qmk;
     request.is_response = false;
     request.request = 12;
 
-    EXPECT_CALL(get_driver, get_driver(4))
-        .WillRepeatedly(Return(driver1.get_driver()));
-
-    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    EXPECT_CALL(process, api_process_qmk(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
         .WillOnce(Invoke(
             [](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
             })
         );
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_unhandled*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_unhandled),
@@ -1260,7 +1324,7 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
         .Times(2)
         .WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(request);
                 return &request;
             }
@@ -1269,21 +1333,19 @@ TEST_F(Api, AnUnhandledIncomingQMKRequestReturnsUnhandled) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
+TEST_F(RemotelyConnectedApi, AResponseIsOnlySentOnceEvenIfCalledTwice) {
     ProcessApiMock process;
     req_qmk request;
     request.id = api_command_qmk;
     request.is_response = false;
     request.request = 12;
 
-    EXPECT_CALL(get_driver, get_driver(4)).WillRepeatedly(Return(driver1.get_driver()));
-
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
         res->response = 42;
         API_SEND_RESPONSE(endpoint, qmk, res);
     };
 
-    EXPECT_CALL(process, api_process_qmk(4, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
+    EXPECT_CALL(process, api_process_qmk(1, reinterpret_cast<api_packet_t*>(&request), sizeof(request)))
         .WillOnce(Invoke(
             [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
@@ -1292,7 +1354,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
             }
         ));
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_qmk),
@@ -1306,7 +1368,7 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
         .Times(2)
         .WillOnce(Invoke(
             [&request](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(request);
                 return &request;
             }
@@ -1315,17 +1377,14 @@ TEST_F(Api, AResponseIsOnlySentOnceEvenIfCalledTwice) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, ATooSmallIncomingPacketReturnsProtocolError) {
+TEST_F(RemotelyConnectedApi, ATooSmallIncomingPacketReturnsProtocolError) {
     ProcessApiMock process;
     uint8_t buffer[1];
-
-    EXPECT_CALL(get_driver, get_driver(4))
-        .WillRepeatedly(Return(driver1.get_driver()));
 
     EXPECT_CALL(process, api_process_qmk(_,_,_))
         .Times(0);
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_protocol_error),
@@ -1338,7 +1397,7 @@ TEST_F(Api, ATooSmallIncomingPacketReturnsProtocolError) {
         .Times(2)
         .WillOnce(Invoke(
             [&buffer](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = 1;
                 return buffer;
             }
@@ -1347,17 +1406,16 @@ TEST_F(Api, ATooSmallIncomingPacketReturnsProtocolError) {
      api_process_driver(driver1.get_driver());
 }
 
-TEST_F(Api, AnUnexpectedResponseReturnsProtocolError) {
+TEST_F(RemotelyConnectedApi, AnUnexpectedResponseReturnsProtocolError) {
     ProcessApiMock process;
     res_qmk res;
-
-    EXPECT_CALL(get_driver, get_driver(4))
-        .WillRepeatedly(Return(driver1.get_driver()));
+    res.is_response = true;
+    res.id = api_command_qmk;
 
     EXPECT_CALL(process, api_process_qmk(_,_,_))
         .Times(0);
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_protocol_error*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_protocol_error),
@@ -1370,7 +1428,7 @@ TEST_F(Api, AnUnexpectedResponseReturnsProtocolError) {
         .Times(2)
         .WillOnce(Invoke(
             [&res](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(res);
                 return &res;
             }
@@ -1405,7 +1463,7 @@ TEST_F(ConnectedApi, AnUnalignedResponseIsAutomaticallyAligned) {
     EXPECT_EQ(42, res->response);
 }
 
-TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
+TEST_F(RemotelyConnectedApi, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
     ProcessApiMock process;
 
     req_qmk req;
@@ -1415,7 +1473,7 @@ TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
     uint8_t buffer[sizeof(req) + 1];
     memcpy(buffer + 1, &req, sizeof(req));
 
-    EXPECT_CALL(get_driver, get_driver(4))
+    EXPECT_CALL(get_driver, get_driver(1))
         .WillRepeatedly(Return(driver1.get_driver()));
 
     auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
@@ -1425,7 +1483,7 @@ TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
         API_SEND_RESPONSE(endpoint, qmk, res);
     };
 
-    EXPECT_CALL(process, api_process_qmk(4, _, _))
+    EXPECT_CALL(process, api_process_qmk(1, _, _))
         .WillOnce(Invoke(
             [&handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
@@ -1434,7 +1492,7 @@ TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
             }
         ));
     EXPECT_CALL(driver1,
-        send(4,
+        send(1,
             MatcherCast<void*>(MatcherCast<res_qmk*>(AllOf(
                 CommandIsResponse(),
                 CommandIs(api_command_qmk),
@@ -1448,7 +1506,7 @@ TEST_F(Api, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
         .Times(2)
         .WillOnce(Invoke(
             [&buffer](uint8_t* endpoint, uint8_t* size) {
-                *endpoint = 4;
+                *endpoint = 1;
                 *size = sizeof(req_qmk);
                 return buffer + 1;
             }

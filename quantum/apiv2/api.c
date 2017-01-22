@@ -28,6 +28,10 @@ static uint8_t outgoing_connections[API_MAX_CONNECTED_ENDPOINTS] = {
     [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = NOT_CONNECTED
 };
 
+static uint8_t incoming_connections[API_MAX_CONNECTED_ENDPOINTS] = {
+    [0 ... API_MAX_CONNECTED_ENDPOINTS - 1] = NOT_CONNECTED
+};
+
 static uint8_t aligned_packet[API_MAX_SIZE] __attribute__((aligned(API_ALIGN)));
 
 static bool s_response_sent = false;
@@ -96,12 +100,21 @@ bool api_is_connected(uint8_t endpoint) {
 void api_reset(void) {
     for (int i=0; i < API_MAX_CONNECTED_ENDPOINTS; ++i) {
         outgoing_connections[i] = NOT_CONNECTED;
+        incoming_connections[i] = NOT_CONNECTED;
     }
     s_response_sent = false;
 }
 
 static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_connect* resp) {
-    resp->successful = req->protocol_version == API_PROTOCOL_VERSION;
+    resp->successful = false;
+    if (req->protocol_version == API_PROTOCOL_VERSION) {
+        uint8_t* connection = get_or_reserve_connection(endpoint, incoming_connections);
+        //TODO: Test the case where no connection could be reserved
+        if (connection) {
+            resp->successful = true;
+            *connection = endpoint;
+        }
+    }
 }
 
 static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
@@ -111,10 +124,15 @@ static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t siz
 }
 
 static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
+    s_response_sent = false;
+    bool connected = get_connection(endpoint, incoming_connections) != NULL;
+
     if (size < sizeof(api_packet_t) ) {
-        res_protocol_error res;
-        res.error = PROTOCOL_ERROR_INCOMING_TOO_SMALL;
-        API_SEND_RESPONSE(endpoint, protocol_error, &res);
+        if (connected) {
+            res_protocol_error res;
+            res.error = PROTOCOL_ERROR_INCOMING_TOO_SMALL;
+            API_SEND_RESPONSE(endpoint, protocol_error, &res);
+        }
         return;
     }
 
@@ -128,7 +146,16 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         #endif
     }
 
+
     api_packet_t* packet = (api_packet_t*)(buffer);
+
+    if (!connected && packet->id != api_command_connect) {
+        res_protocol_error response;
+        response.error = PROTOCOL_ERROR_NOT_CONNECTED;
+        API_SEND_RESPONSE(endpoint, protocol_error, &response);
+        return;
+    }
+
     // We should not receive responses if we are not waiting for it
     if (packet->is_response) {
         res_protocol_error res;
@@ -136,10 +163,8 @@ static void add_packet(uint8_t endpoint, void* buffer, uint8_t size) {
         API_SEND_RESPONSE(endpoint, protocol_error, &res);
         return;
     }
-    // TODO: Should not accept any packets unless the remote is connected
-    // Should also disconnect on the above errors
+    // TODO: Should disconnect the remote on the above errors
     // Note that connected here means the the incoming connection, not the outgoing one
-    s_response_sent = false;
 
     switch (packet->id) {
     case api_internal_begin ... api_internal_end:
