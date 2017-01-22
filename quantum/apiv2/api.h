@@ -109,6 +109,7 @@ typedef struct {
 }api_driver_t;
 
 // The keyboard should implement this, you can return NULL for unsupported endpoints
+// TODO: The memory usage could be slightly reduced if the api_driver_t was stored in PROGMEM
 api_driver_t* api_get_driver(uint8_t endpoint);
 
 // The keyboard should call this once per scan loop for each driver

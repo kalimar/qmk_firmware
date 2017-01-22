@@ -208,7 +208,6 @@ void api_send_response(uint8_t endpoint, uint16_t command, void* buffer, uint8_t
 
 void api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size) {
     if (size < sizeof(api_packet_t)) {
-        //TODO: This is not properly tested
         disconnect_endpoint(endpoint, outgoing_connections);
         return;
     }
@@ -219,7 +218,6 @@ void api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size) {
     bool connected = api_is_connected(endpoint);
     if (connected) {
         connected = driver->send(endpoint, data, size);
-        // TODO: Probably need to be tested separately
         if (!connected) {
             disconnect_endpoint(endpoint, outgoing_connections);
         }
@@ -248,8 +246,6 @@ void* api_recv_response(uint8_t endpoint, uint16_t command, uint8_t size) {
         }
 
         if (actual_recv_size >= sizeof(api_packet_t) && res->is_response == false) {
-            // TODO: This need to be unit tested
-            // Now partly unit tested for connection packets
             add_packet(recv_endpoint, res, actual_recv_size);
             continue;
         }
