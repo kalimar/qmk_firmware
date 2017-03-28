@@ -53,7 +53,8 @@ bool api_is_connected(uint8_t endpoint);
 
 // Send a request to the endpoint asynchronically
 void api_send(uint8_t endpoint, uint16_t command, void* data, uint8_t size);
-// Send a response to the endpoint asynchronically, you don't normally call this, instead use API_HANDLE
+// Send a response to the endpoint asynchronically, you don't normally call this, instead use
+// API_HANDLE_AND_RESPOND
 void api_send_response(uint8_t endpoint, uint16_t command, void* buffer, uint8_t size);
 // Receive a response to the last command that has one, this will block until the response is received
 // or the connection is disconnected. When there's a disconnect, NULL is returned. NOTE: You should always
@@ -126,23 +127,50 @@ api_driver_t* api_get_driver(uint8_t endpoint);
 void api_process_driver(api_driver_t* driver);
 
 // QMK, the keyboard and the keymap should implement these
-// They are called when new incoming packets are received, use API_HANDLE below inside a switch statement like
-// this:
+// They are called when new incoming packets are received, use API_HANDLE_AND_RESPOND or
+// API_HANDLE_NO_RESPONSE, which are defined below, inside a switch statement like this:
 // api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
 //    switch (packet->id) {
-//        API_HANDLE(qmk, handle_qmk);
+//        API_HANDLE_AND_RESPOND(qmk, handle_qmk);
+//        API_HANDLE_NO_RESPONSE(command_without_response, handle_command_without_response);
 //    }
 //}
-
 void api_process_qmk(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keyboard(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 void api_process_keymap(uint8_t endpoint, api_packet_t* packet, uint8_t size);
 
-// Use this macro to handle incoming requests inside a switch statement inside the the above process
+
+// Use these two macros to handle incoming requests inside the switch statements of the above process
 // functions.
 // The id is the command id excluding the prefix "api_command_"
 // The function is a function to be called when the request is received
-#define API_HANDLE(id, function) \
+
+// Use this macro when you want to return a response
+// The function need to have the following signature
+// void process_function(uint8_t endpoint, const req_id* req, res_id* resp);
+// Where endpoint is the endpoint that sent the packet request. Req is the incoming request. And resp is the
+// response to return, you should modify it inside the function.
+// Note: The sender normally has to call API_SEND_AND_RECEIVE for these types of request, otherwise you will
+// get errors. It is possible for advanced protocols to use the API_SEND, but then you eventually need to call
+// API_RECV_RESPONSE. It's allowed to call API_SEND multiple times with different requests before calling
+// API_RECV_RESPONSE, but all of those has to be repsonseless requests.
+#define API_HANDLE_AND_RESPOND(id, function) \
+    case api_command_##id: \
+        if (sizeof(req_##id) == size) { \
+            req_##id* request = (req_##id*)(packet); \
+            res_##id response; \
+            function(endpoint, request, &response); \
+            api_send_response(endpoint, api_command_##id, &response, sizeof(response)); \
+        } \
+        break;
+
+// Use this macro when you want to return a response
+// The function need to have the following signature
+// void process_function(uint8_t endpoint, const req_id* req);
+// Where endpoint is the endpoint that sent the packet request and req is the incoming request.
+// Note: The sender side has to use API_SEND and not API_SEND_AND_RECEIVE for these requests, otherwise you
+// will get protocol errors.
+#define API_HANDLE_WITHOUT_RESPONSE(id, function) \
     case api_command_##id: \
         if (sizeof(req_##id) == size) { \
             req_##id* request = (req_##id*)(packet); \

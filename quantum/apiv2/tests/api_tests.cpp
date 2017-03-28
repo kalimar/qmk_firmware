@@ -1174,7 +1174,7 @@ TEST_F(RemotelyConnectedApi, AnAcceptedIncomingQMKRequestReturnsTheCorrectRespon
     request.is_response = false;
     request.request = 12;
 
-    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+    auto handle_qmk = [](uint8_t endpoint, const req_qmk* req, res_qmk* res) {
         res->response = 42;
     };
 
@@ -1182,7 +1182,7 @@ TEST_F(RemotelyConnectedApi, AnAcceptedIncomingQMKRequestReturnsTheCorrectRespon
         .WillOnce(Invoke(
             [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(qmk, handle_qmk);
+                    API_HANDLE_AND_RESPOND(qmk, handle_qmk);
                 }
             })
         );
@@ -1225,7 +1225,7 @@ TEST_F(RemotelyConnectedApi, AnAcceptedIncomingKeyboardRequestReturnsTheCorrectR
         .WillOnce(Invoke(
             [handle_keyboard](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(keyboard, handle_keyboard);
+                    API_HANDLE_AND_RESPOND(keyboard, handle_keyboard);
                 }
             }
         ));
@@ -1268,7 +1268,7 @@ TEST_F(RemotelyConnectedApi, AnAcceptedIncomingKeymapRequestReturnsTheCorrectRes
         .WillOnce(Invoke(
             [handle_keymap](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(keymap, handle_keymap);
+                    API_HANDLE_AND_RESPOND(keymap, handle_keymap);
                 }
             }
         ));
@@ -1361,7 +1361,7 @@ TEST_F(RemotelyConnectedApi, AResponseIsOnlySentOnceEvenIfCalledTwice) {
     request.is_response = false;
     request.request = 12;
 
-    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+    auto handle_qmk = [](uint8_t endpoint, const req_qmk* req, res_qmk* res) {
         res->response = 42;
         API_SEND_RESPONSE(endpoint, qmk, res);
     };
@@ -1370,7 +1370,7 @@ TEST_F(RemotelyConnectedApi, AResponseIsOnlySentOnceEvenIfCalledTwice) {
         .WillOnce(Invoke(
             [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(qmk, handle_qmk);
+                    API_HANDLE_AND_RESPOND(qmk, handle_qmk);
                 }
             }
         ));
@@ -1542,7 +1542,7 @@ TEST_F(RemotelyConnectedApi, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
     EXPECT_CALL(get_driver, get_driver(1))
         .WillRepeatedly(Return(driver1.get_driver()));
 
-    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+    auto handle_qmk = [](uint8_t endpoint, const req_qmk* req, res_qmk* res) {
         EXPECT_EQ(0, reinterpret_cast<uintptr_t>(req) % API_ALIGN);
         EXPECT_EQ(42, req->request);
         res->response = 10;
@@ -1553,7 +1553,7 @@ TEST_F(RemotelyConnectedApi, AnUnalignedIncomingPacketIsAutomaticallyAligned) {
         .WillOnce(Invoke(
             [&handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(qmk, handle_qmk);
+                    API_HANDLE_AND_RESPOND(qmk, handle_qmk);
                 }
             }
         ));
@@ -1657,14 +1657,14 @@ TEST_F(ConnectedApi, ProcessAnIncomingRequestDuringSendAndRecv) {
                 return &response;
             }
         ));
-    auto handle_qmk = [](uint8_t endpoint, req_qmk* req, res_qmk* res) {
+    auto handle_qmk = [](uint8_t endpoint, const req_qmk* req, res_qmk* res) {
         res->response = 42;
     };
     EXPECT_CALL(process, api_process_qmk(2, reinterpret_cast<api_packet_t*>(&request2), sizeof(request2)))
         .WillOnce(Invoke(
             [handle_qmk](uint8_t endpoint, api_packet_t* packet, uint8_t size) {
                 switch (packet->id) {
-                    API_HANDLE(qmk, handle_qmk);
+                    API_HANDLE_AND_RESPOND(qmk, handle_qmk);
                 }
             }
         ));

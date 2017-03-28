@@ -105,7 +105,7 @@ void api_reset(void) {
     s_response_sent = false;
 }
 
-static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_connect* resp) {
+static void process_incoming_connect(uint8_t endpoint, const req_connect* req, res_connect* resp) {
     resp->successful = false;
     uint8_t* connection = get_or_reserve_connection(endpoint, incoming_connections);
     if (req->protocol_version == API_PROTOCOL_VERSION) {
@@ -122,7 +122,7 @@ static void process_incoming_connect(uint8_t endpoint, req_connect* req, res_con
 
 static void process_internal(uint8_t endpoint, api_packet_t* packet, uint8_t size) {
     switch(packet->id) {
-        API_HANDLE(connect, process_incoming_connect);
+        API_HANDLE_AND_RESPOND(connect, process_incoming_connect);
     }
 }
 
