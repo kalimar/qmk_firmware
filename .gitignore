@@ -41,3 +41,20 @@ util/Win_Check_Output.txt
 *.png
 *.jpg
 *.gif
+
+# mkpgk build files
+**/msys2_packages/*/*.tar.xz
+**/msys2_packages/*/*.tar.gz
+**/msys2_packages/*/*.tar.bz2
+**/msys2_packages/*/*.tgz
+**/msys2_packages/*/*.zip
+**/msys2_packages/*/*.rar
+**/msys2_packages/*/*.sig
+**/msys2_packages/*/*.asc
+**/msys2_packages/*/*.log
+**/msys2_packages/*/*.log.[0-9]*
+**/msys2_packages/*/src/
+**/msys2_packages/*/pkg/
+**/msys2_packages/*/*~
+**/msys2_packages/*/*.swp
+**/msys2_packages/*/*.swo

@@ -40,8 +40,9 @@
 Makefile eol=lf
 *.mk eol=lf
 
-# make files (need to always use lf for compatibility with Windows 10 bash)
+# shell scripts (need to always use lf for compatibility with Windows 10 bash)
 *.sh eol=lf
+PKGBUILD eol=lf
 
 # documentation
 *.markdown   text
