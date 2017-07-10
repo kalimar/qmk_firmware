@@ -4,6 +4,19 @@ pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=3.5.4
 pkgrel=1
 arch=('any')
+url=http://distribute.atmel.no/tools/opensource/Atmel-AVR-GNU-Toolchain/${pkgver}
+source=(${url}/build-avr8-gnu-toolchain-git.sh
+        ${url}/avr-binutils.tar.bz2
+        ${url}/avr-gcc.tar.bz2
+        ${url}/avr-gdb.tar.bz2
+        ${url}/avr-libc.tar.bz2
+        ${url}/avr8-headers.zip)
+md5sums=('e918adc5ecbfaa6ff7b3f6bac4df370c'
+         '2929edd12f24c774f90cb109fc45630b'
+         'a10ce1c02bc9e990f3c88252f3b7bb25'
+         '97a8ec640265cc5ff8a50e599ab55367'
+         '1ce93dad526aab4d564462d9301f2b62'
+         '8fa41a0b91bef127bd82c8c66df9eb6c')
 
 build() {
   echo "build"

@@ -58,3 +58,4 @@ util/Win_Check_Output.txt
 **/msys2_packages/*/*~
 **/msys2_packages/*/*.swp
 **/msys2_packages/*/*.swo
+**/msys2_packages/*/*.sh
