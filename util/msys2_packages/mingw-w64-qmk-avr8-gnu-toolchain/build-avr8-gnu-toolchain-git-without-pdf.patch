@@ -1,0 +1,19 @@
+--- build-avr8-gnu-toolchain-git.sh	2017-07-11 09:27:25.368000000 +0300
++++ build-avr8-gnu-toolchain-git.sh	2017-07-11 10:03:10.251465200 +0300
+@@ -822,7 +822,6 @@ function avr_libc_build()
+               --enable-doc \
+               --disable-versioned-doc \
+               --enable-html-doc \
+-              --enable-pdf-doc \
+               --enable-man-doc \
+               --enable-xml-doc \
+               --mandir="$PREFIX"/man \
+@@ -1320,7 +1319,7 @@ fi
+ 
+ ############# Check for necessary programs #######################
+ for PREREQ in autoconf make gcc tar patch \
+-    pdflatex pngtopnm epstopdf doxygen
++    doxygen
+ do
+     RUN=`type -ap $PREREQ |sort |uniq |wc -l`
+     if [ $RUN -eq 0 ]

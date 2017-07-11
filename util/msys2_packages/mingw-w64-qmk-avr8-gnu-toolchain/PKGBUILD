@@ -4,24 +4,41 @@ pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
 pkgver=3.5.4
 pkgrel=1
 arch=('any')
+makedepends=("${MINGW_PACKAGE_PREFIX}-gcc" "${MINGW_PACKAGE_PREFIX}-doxygen")
+options=('staticlibs' '!debug' '!strip')
 url=http://distribute.atmel.no/tools/opensource/Atmel-AVR-GNU-Toolchain/${pkgver}
 source=(${url}/build-avr8-gnu-toolchain-git.sh
         ${url}/avr-binutils.tar.bz2
         ${url}/avr-gcc.tar.bz2
         ${url}/avr-gdb.tar.bz2
         ${url}/avr-libc.tar.bz2
-        ${url}/avr8-headers.zip)
-md5sums=('e918adc5ecbfaa6ff7b3f6bac4df370c'
-         '2929edd12f24c774f90cb109fc45630b'
-         'a10ce1c02bc9e990f3c88252f3b7bb25'
-         '97a8ec640265cc5ff8a50e599ab55367'
-         '1ce93dad526aab4d564462d9301f2b62'
-         '8fa41a0b91bef127bd82c8c66df9eb6c')
+        ${url}/avr8-headers.zip
+        https://ftp.gnu.org/gnu/gmp/gmp-5.0.2.tar.bz2
+        https://ftp.gnu.org/gnu/mpfr/mpfr-3.0.0.tar.bz2
+        http://www.multiprecision.org/mpc/download/mpc-0.9.tar.gz
+        https://ftp.gnu.org/gnu/ncurses/ncurses-5.9.tar.gz
+        build-avr8-gnu-toolchain-git-without-pdf.patch)
+sha256sums=('ee45e27cdfce2322cdae134959df8677c346e0489e285a13f3e99349464a2104'
+            '11c1700ca0e80be28548eaaa4d1e245804b9fb5cc1686accae42df4ab3a4db6a'
+            'aef6485df226c9bfb9a3c986f98bc1de3ab4e36f8fdae660ac17708fba6273a4'
+            '16198b7c88ccfdd661a27b9070c2fab8eb13c993ba23821d9e26fc66dc3464ee'
+            '104be58d9fc96c0f3c7176bad0df316d1c014574fc5452426f5a3043f4ef648f'
+            '09e39df0418d3e8dd32e57bdbf3030ef396b1d671fb0271ea4a4f83e3579f5bd'
+            'dbc2db76fdd4e99f85d5e35aa378ed62c283e0d586b91bd8703aff75a7804c28'
+            '8f4e5f9c53536cb798a30455ac429b1f9fc75a0f8af32d6e0ac31ebf1024821f'
+            'fd3efe422f0d454592059e80f2c00d1a2e381bf2beda424c5094abd4deb049ac'
+            '9046298fb440324c9d4135ecea7879ffed8546dd1b58e59430ea07a4633f563b'
+            'a0da3e0a4c2228206d487cdfa71ab8398352e3d34de53f49b080afc538d40ca7')
 
-build() {
-  echo "build"
+
+prepare() {
+  pwd
+  mkdir -p headers 
+  cp avr8-headers.zip headers/
+  patch -p0 -i build-avr8-gnu-toolchain-git-without-pdf.patch
 }
 
 package() {
-  echo "package"
+  mkdir -p build
+  bash build-avr8-gnu-toolchain-git.sh -b build -p ${pkgdir}${MINGW_PREFIX}
 }
